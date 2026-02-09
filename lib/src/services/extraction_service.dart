@@ -214,9 +214,8 @@ class ExtractionService {
       final fromId = map['fromConceptId'] as String;
       final toId = map['toConceptId'] as String;
 
-      // Warn on orphaned references but still include them
+      // Skip relationships with orphaned concept references
       if (!conceptIds.contains(fromId) || !conceptIds.contains(toId)) {
-        // Skip relationships with orphaned references
         continue;
       }
 
