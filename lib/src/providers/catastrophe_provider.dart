@@ -79,12 +79,16 @@ final catastropheProvider =
 class CatastropheNotifier extends Notifier<CatastropheState> {
   @override
   CatastropheState build() {
-    // Watch health and react to changes.
+    // Seed previousTier from current health to avoid phantom events on cold start.
+    final currentHealth = ref.read(networkHealthProvider);
+    final initialTier = currentHealth.tier;
+
+    // Watch health and react to subsequent changes.
     ref.listen(networkHealthProvider, (previous, next) {
       _onHealthChanged(previous, next);
     });
 
-    return const CatastropheState();
+    return CatastropheState(previousTier: initialTier);
   }
 
   void _onHealthChanged(NetworkHealth? previous, NetworkHealth next) {
@@ -160,7 +164,7 @@ class CatastropheNotifier extends Notifier<CatastropheState> {
   void _onImprovingTransition(TierTransition transition) {
     // Resolve events whose tier is now above the current tier
     final resolvedEvents = state.activeEvents.map((event) {
-      if (!event.isResolved && event.tier.index >= transition.to.index) {
+      if (!event.isResolved && event.tier.index > transition.to.index) {
         return event.withResolved(
           DateTime.now().toUtc().toIso8601String(),
         );
@@ -180,10 +184,11 @@ class CatastropheNotifier extends Notifier<CatastropheState> {
 
   /// Record that a concept was reviewed during a repair mission.
   void recordMissionReview(String conceptId) {
+    final now = DateTime.now().toUtc();
     final updatedMissions = state.activeMissions.map((mission) {
       if (mission.isComplete) return mission;
       if (!mission.conceptIds.contains(conceptId)) return mission;
-      return mission.withReviewedConcept(conceptId);
+      return mission.withReviewedConcept(conceptId, now: now);
     }).toList();
 
     // Remove completed missions from active list

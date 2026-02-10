@@ -52,8 +52,9 @@ class RepairMission {
   /// Number of concepts remaining.
   int get remaining => conceptIds.length - reviewedConceptIds.length;
 
-  RepairMission withReviewedConcept(String conceptId) {
+  RepairMission withReviewedConcept(String conceptId, {required DateTime now}) {
     if (reviewedConceptIds.contains(conceptId)) return this;
+    if (!conceptIds.contains(conceptId)) return this;
     final updated = [...reviewedConceptIds, conceptId];
     return RepairMission(
       id: id,
@@ -62,7 +63,7 @@ class RepairMission {
       createdAt: createdAt,
       completedAt:
           updated.length >= conceptIds.length
-              ? DateTime.now().toUtc().toIso8601String()
+              ? now.toUtc().toIso8601String()
               : null,
       catastropheEventId: catastropheEventId,
     );
