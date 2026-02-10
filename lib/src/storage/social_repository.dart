@@ -1,8 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../models/challenge.dart';
 import '../models/friend.dart';
+import '../models/nudge.dart';
 
-/// Firestore operations for social features: wiki groups and friends.
+/// Firestore operations for social features: wiki groups, friends,
+/// challenges, and nudges.
 class SocialRepository {
   SocialRepository({
     required FirebaseFirestore firestore,
@@ -68,5 +71,82 @@ class SocialRepository {
         .snapshots()
         .map((snapshot) =>
             snapshot.docs.map((doc) => Friend.fromJson(doc.data())).toList());
+  }
+
+  // --- Challenges ---
+
+  /// Send a challenge to a friend.
+  Future<void> sendChallenge(Challenge challenge) async {
+    await _firestore
+        .collection('social')
+        .doc('challenges')
+        .collection('items')
+        .doc(challenge.id)
+        .set(challenge.toJson());
+  }
+
+  /// Watch incoming challenges for the current user.
+  Stream<List<Challenge>> watchIncomingChallenges() {
+    return _firestore
+        .collection('social')
+        .doc('challenges')
+        .collection('items')
+        .where('toUid', isEqualTo: _userId)
+        .where('status', isEqualTo: ChallengeStatus.pending.name)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => Challenge.fromJson(doc.data()))
+            .toList());
+  }
+
+  /// Update challenge status (accept, complete, decline).
+  Future<void> updateChallengeStatus(
+    String challengeId,
+    ChallengeStatus status, {
+    int? score,
+  }) async {
+    final data = <String, dynamic>{'status': status.name};
+    if (score != null) data['score'] = score;
+    await _firestore
+        .collection('social')
+        .doc('challenges')
+        .collection('items')
+        .doc(challengeId)
+        .update(data);
+  }
+
+  // --- Nudges ---
+
+  /// Send a nudge to a friend.
+  Future<void> sendNudge(Nudge nudge) async {
+    await _firestore
+        .collection('social')
+        .doc('nudges')
+        .collection('items')
+        .doc(nudge.id)
+        .set(nudge.toJson());
+  }
+
+  /// Watch incoming nudges for the current user.
+  Stream<List<Nudge>> watchIncomingNudges() {
+    return _firestore
+        .collection('social')
+        .doc('nudges')
+        .collection('items')
+        .where('toUid', isEqualTo: _userId)
+        .where('status', isEqualTo: NudgeStatus.pending.name)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => Nudge.fromJson(doc.data())).toList());
+  }
+
+  /// Mark nudge as seen.
+  Future<void> markNudgeSeen(String nudgeId) async {
+    await _firestore
+        .collection('social')
+        .doc('nudges')
+        .collection('items')
+        .doc(nudgeId)
+        .update({'status': NudgeStatus.seen.name});
   }
 }
