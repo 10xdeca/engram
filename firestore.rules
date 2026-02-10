@@ -71,10 +71,12 @@ service cloud.firestore {
       allow update: if isGroupMember(groupId);
     }
 
-    // Glory board: group members can read all and write any entry
+    // Glory board: group members can read all, create and update any entry
     // (cooperative system awards points across team members).
+    // No delete — glory entries are permanent.
     match /wikiGroups/{groupId}/glory/{uid} {
-      allow read, write: if isGroupMember(groupId);
+      allow read: if isGroupMember(groupId);
+      allow create, update: if isGroupMember(groupId);
     }
 
     // --- Social: challenges ---

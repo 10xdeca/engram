@@ -96,13 +96,14 @@ class QuizSessionNotifier extends Notifier<QuizSessionState> {
 
     await ref.read(knowledgeGraphProvider.notifier).updateQuizItem(updated);
 
-    // Record mission progress and award glory points
+    // Record mission progress and award glory points (fire-and-forget to
+    // avoid blocking the quiz flow with a network round-trip).
     if (inMission) {
       ref.read(catastropheProvider.notifier).recordMissionReview(item.conceptId);
       final teamRepo = ref.read(teamRepositoryProvider);
       final uid = ref.read(authStateProvider).valueOrNull?.uid;
       if (teamRepo != null && uid != null) {
-        await teamRepo.addGloryPoints(uid, missionPoints: 1);
+        teamRepo.addGloryPoints(uid, missionPoints: 1);
       }
     }
 

@@ -221,7 +221,7 @@ class TeamRepository {
     }
     if (updates.isEmpty) return;
 
-    await _groupDoc.collection('glory').doc(uid).update(updates);
+    await _groupDoc.collection('glory').doc(uid).set(updates, SetOptions(merge: true));
   }
 
   /// Stream the full glory board (all members, sorted client-side).
