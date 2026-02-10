@@ -8,20 +8,17 @@ import '../storage/local_graph_repository.dart';
 import 'settings_provider.dart';
 
 /// Provides the active [GraphRepository] implementation.
-/// Returns [FirestoreGraphRepository] when cloud sync is enabled and
-/// user is signed in; otherwise returns [LocalGraphRepository].
+/// Uses [FirestoreGraphRepository] when user is authenticated;
+/// falls back to [LocalGraphRepository] for unauthenticated/offline use.
 final graphRepositoryProvider = Provider<GraphRepository>((ref) {
   final config = ref.watch(settingsProvider);
-  final settingsRepo = ref.watch(settingsRepositoryProvider);
+  final user = FirebaseAuth.instance.currentUser;
 
-  if (settingsRepo.getUseFirestore()) {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      return FirestoreGraphRepository(
-        firestore: FirebaseFirestore.instance,
-        userId: user.uid,
-      );
-    }
+  if (user != null) {
+    return FirestoreGraphRepository(
+      firestore: FirebaseFirestore.instance,
+      userId: user.uid,
+    );
   }
 
   return LocalGraphRepository(dataDir: config.dataDir);
