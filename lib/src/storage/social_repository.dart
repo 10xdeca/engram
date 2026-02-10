@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/challenge.dart';
+import '../models/detailed_mastery_snapshot.dart';
 import '../models/friend.dart';
 import '../models/nudge.dart';
 
@@ -71,6 +72,41 @@ class SocialRepository {
         .snapshots()
         .map((snapshot) =>
             snapshot.docs.map((doc) => Friend.fromJson(doc.data())).toList());
+  }
+
+  // --- Detailed Mastery Snapshots ---
+
+  /// Publish this user's per-concept mastery data for teammates to see.
+  /// Written to the wiki group so all members can stream it.
+  Future<void> writeDetailedMasterySnapshot({
+    required String wikiUrlHash,
+    required DetailedMasterySnapshot snapshot,
+  }) async {
+    await _firestore
+        .collection('wikiGroups')
+        .doc(wikiUrlHash)
+        .collection('memberSnapshots')
+        .doc(_userId)
+        .set(snapshot.toJson());
+  }
+
+  /// Stream all team members' detailed mastery snapshots.
+  Stream<Map<String, DetailedMasterySnapshot>> watchMemberSnapshots(
+    String wikiUrlHash,
+  ) {
+    return _firestore
+        .collection('wikiGroups')
+        .doc(wikiUrlHash)
+        .collection('memberSnapshots')
+        .snapshots()
+        .map((snapshot) {
+      final result = <String, DetailedMasterySnapshot>{};
+      for (final doc in snapshot.docs) {
+        if (doc.id == _userId) continue; // exclude self
+        result[doc.id] = DetailedMasterySnapshot.fromJson(doc.data());
+      }
+      return result;
+    });
   }
 
   // --- Challenges ---
