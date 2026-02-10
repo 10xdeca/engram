@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/user_profile.dart';
@@ -8,12 +7,11 @@ import 'auth_provider.dart';
 /// Provides the [UserProfileRepository] for the current signed-in user.
 /// Returns null if no user is signed in.
 final userProfileRepositoryProvider = Provider<UserProfileRepository?>((ref) {
-  final authState = ref.watch(authStateProvider);
-  final user = authState.valueOrNull;
+  final user = ref.watch(authStateProvider).valueOrNull;
   if (user == null) return null;
 
   return UserProfileRepository(
-    firestore: FirebaseFirestore.instance,
+    firestore: ref.watch(firestoreProvider),
     userId: user.uid,
   );
 });

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
@@ -10,6 +11,12 @@ final firebaseAuthProvider = Provider<FirebaseAuth>((ref) {
   return FirebaseAuth.instance;
 });
 
+/// Provides the [FirebaseFirestore] instance. Override in tests with
+/// `fake_cloud_firestore` for testable Firestore operations.
+final firestoreProvider = Provider<FirebaseFirestore>((ref) {
+  return FirebaseFirestore.instance;
+});
+
 /// Manages authentication state as a stream.
 final authStateProvider = StreamProvider<User?>((ref) {
   return ref.watch(firebaseAuthProvider).authStateChanges();
@@ -18,7 +25,10 @@ final authStateProvider = StreamProvider<User?>((ref) {
 /// Signs in with Google. Returns the Firebase [User] or null on cancel.
 ///
 /// Google always provides displayName, email, and photoUrl on every sign-in.
-Future<User?> signInWithGoogle(FirebaseAuth auth) async {
+Future<User?> signInWithGoogle(
+  FirebaseAuth auth, {
+  required FirebaseFirestore firestore,
+}) async {
   final googleUser = await GoogleSignIn(scopes: ['email', 'profile']).signIn();
   if (googleUser == null) return null; // User cancelled
 
@@ -33,6 +43,7 @@ Future<User?> signInWithGoogle(FirebaseAuth auth) async {
 
   // Write profile to Firestore (idempotent — overwrites with latest data)
   await _writeProfile(
+    firestore: firestore,
     uid: user.uid,
     displayName: googleUser.displayName ?? user.displayName ?? 'User',
     email: googleUser.email,
@@ -45,7 +56,10 @@ Future<User?> signInWithGoogle(FirebaseAuth auth) async {
 ///
 /// Apple only provides name + email on the FIRST sign-in. Subsequent
 /// sign-ins return null for these fields. We capture and persist immediately.
-Future<User?> signInWithApple(FirebaseAuth auth) async {
+Future<User?> signInWithApple(
+  FirebaseAuth auth, {
+  required FirebaseFirestore firestore,
+}) async {
   final appleCredential = await SignInWithApple.getAppleIDCredential(
     scopes: [
       AppleIDAuthorizationScopes.fullName,
@@ -69,14 +83,33 @@ Future<User?> signInWithApple(FirebaseAuth auth) async {
     appleName = [givenName, familyName].whereType<String>().join(' ').trim();
   }
 
-  // Apple never provides a photo URL
-  await _writeProfile(
-    uid: user.uid,
-    displayName: appleName ?? user.displayName ?? 'User',
-    email: appleCredential.email ?? user.email,
-    photoUrl: null,
-    onlyIfNew: appleName == null, // Don't overwrite name if Apple didn't give one
-  );
+  // Apple never provides a photo URL.
+  // CRITICAL: Apple only sends name on first sign-in. If this write fails,
+  // the name is lost forever. Retry up to 2 times before giving up.
+  final isFirstSignIn = appleName != null;
+  var retries = isFirstSignIn ? 2 : 0;
+  while (true) {
+    try {
+      await _writeProfile(
+        firestore: firestore,
+        uid: user.uid,
+        displayName: appleName ?? user.displayName ?? 'User',
+        email: appleCredential.email ?? user.email,
+        photoUrl: null,
+        onlyIfNew: !isFirstSignIn,
+      );
+      break;
+    } catch (e) {
+      if (retries > 0) {
+        retries--;
+        await Future<void>.delayed(const Duration(seconds: 1));
+      } else {
+        // Log but don't block sign-in — the user is already authenticated
+        debugPrint('CRITICAL: Failed to write Apple profile for ${user.uid}: $e');
+        break;
+      }
+    }
+  }
   return user;
 }
 
@@ -100,14 +133,14 @@ Future<void> signOut(FirebaseAuth auth) async {
 /// This prevents overwriting Apple name data on subsequent sign-ins where
 /// Apple returns null for name fields.
 Future<void> _writeProfile({
+  required FirebaseFirestore firestore,
   required String uid,
   required String displayName,
   String? email,
   String? photoUrl,
   bool onlyIfNew = false,
 }) async {
-  final docRef =
-      FirebaseFirestore.instance.collection('users').doc(uid);
+  final docRef = firestore.collection('users').doc(uid);
   final profileRef = docRef.collection('profile').doc('main');
 
   if (onlyIfNew) {

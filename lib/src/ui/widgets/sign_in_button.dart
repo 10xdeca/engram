@@ -19,9 +19,8 @@ class SignInButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 280,
-      height: 48,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 320, minHeight: 48),
       child: ElevatedButton.icon(
         onPressed: onPressed,
         icon: icon,

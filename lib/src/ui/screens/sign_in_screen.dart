@@ -1,5 +1,4 @@
-import 'dart:io' show Platform;
-
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -24,7 +23,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     });
     try {
       final auth = ref.read(firebaseAuthProvider);
-      await signInWithGoogle(auth);
+      final firestore = ref.read(firestoreProvider);
+      await signInWithGoogle(auth, firestore: firestore);
     } catch (e) {
       if (mounted) {
         setState(() => _error = e.toString());
@@ -41,7 +41,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     });
     try {
       final auth = ref.read(firebaseAuthProvider);
-      await signInWithApple(auth);
+      final firestore = ref.read(firestoreProvider);
+      await signInWithApple(auth, firestore: firestore);
     } catch (e) {
       if (mounted) {
         setState(() => _error = e.toString());
@@ -54,7 +55,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isApplePlatform = Platform.isIOS || Platform.isMacOS;
+    final isApplePlatform = defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS;
 
     return Scaffold(
       body: Center(
