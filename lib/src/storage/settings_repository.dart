@@ -85,7 +85,7 @@ class SettingsRepository {
 
   // --- Cloud sync settings ---
 
-  bool getUseFirestore() => _prefs.getBool(_keyUseFirestore) ?? false;
+  bool getUseFirestore() => _prefs.getBool(_keyUseFirestore) ?? true;
 
   Future<void> setUseFirestore(bool value) =>
       _prefs.setBool(_keyUseFirestore, value);
