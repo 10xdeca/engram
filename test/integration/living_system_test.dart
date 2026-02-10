@@ -95,7 +95,7 @@ KnowledgeGraph buildDependencyGraph({
         nextReview: '2020-01-01T00:00:00.000Z',
         lastReview: null,
       ),
-      QuizItem(
+      const QuizItem(
         id: 'q-helm',
         conceptId: 'helm',
         question: 'What is Helm?',
@@ -310,7 +310,7 @@ void main() {
       // Master Kubernetes
       notifier.startSession();
       // Session should include Kubernetes (and Docker again since nextReview is past)
-      var session = container.read(quizSessionProvider);
+      final session = container.read(quizSessionProvider);
       expect(session.items.any((q) => q.conceptId == 'kubernetes'), isTrue);
 
       // Rate all items in this session
