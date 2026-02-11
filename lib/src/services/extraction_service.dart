@@ -190,13 +190,19 @@ const _splitTool = Tool.custom(
   },
 );
 
+/// Default model used for extraction and sub-concept splitting.
+const defaultExtractionModel = 'claude-sonnet-4-5-20250929';
+
 class ExtractionService {
   ExtractionService({
     required String apiKey,
     AnthropicClient? client,
-  }) : _client = client ?? AnthropicClient(apiKey: apiKey);
+    String model = defaultExtractionModel,
+  })  : _client = client ?? AnthropicClient(apiKey: apiKey),
+        _model = model;
 
   final AnthropicClient _client;
+  final String _model;
 
   Future<ExtractionResult> extract({
     required String documentTitle,
@@ -211,7 +217,7 @@ class ExtractionService {
 
     final response = await _client.createMessage(
       request: CreateMessageRequest(
-        model: const Model.modelId('claude-sonnet-4-5-20250929'),
+        model: Model.modelId(_model),
         maxTokens: 4096,
         system: const CreateMessageRequestSystem.text(_systemPrompt),
         tools: [_extractionTool],
@@ -266,7 +272,7 @@ class ExtractionService {
   }) async {
     final response = await _client.createMessage(
       request: CreateMessageRequest(
-        model: const Model.modelId('claude-sonnet-4-5-20250929'),
+        model: Model.modelId(_model),
         maxTokens: 4096,
         system: const CreateMessageRequestSystem.text(_splitSystemPrompt),
         tools: [_splitTool],
@@ -369,7 +375,10 @@ class ExtractionService {
         name: map['name'] as String,
         description: map['description'] as String,
         sourceDocumentId: '', // Will be set by caller via withNewExtraction
-        tags: (map['tags'] as List<dynamic>?)?.cast<String>() ?? const [],
+        tags: (map['tags'] as List<dynamic>?)
+                ?.map((e) => e as String)
+                .toList() ??
+            const [],
       );
     }).toList();
 

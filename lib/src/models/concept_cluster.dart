@@ -22,9 +22,10 @@ class ConceptCluster {
   factory ConceptCluster.fromJson(Map<String, dynamic> json) {
     return ConceptCluster._raw(
       label: json['label'] as String,
-      conceptIds:
-          (json['conceptIds'] as List<dynamic>?)?.cast<String>().lock ??
-              const IListConst([]),
+      conceptIds: (json['conceptIds'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toIList() ??
+          const IListConst([]),
       guardianUid: json['guardianUid'] as String?,
     );
   }

@@ -28,9 +28,10 @@ class CatastropheEvent {
     return CatastropheEvent._raw(
       id: json['id'] as String,
       tier: HealthTier.values.byName(json['tier'] as String),
-      affectedConceptIds:
-          (json['affectedConceptIds'] as List<dynamic>?)?.cast<String>().lock ??
-              const IListConst([]),
+      affectedConceptIds: (json['affectedConceptIds'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toIList() ??
+          const IListConst([]),
       createdAt: json['createdAt'] as String,
       resolvedAt: json['resolvedAt'] as String?,
       clusterLabel: json['clusterLabel'] as String?,

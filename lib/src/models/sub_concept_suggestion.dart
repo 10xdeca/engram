@@ -1,3 +1,4 @@
+import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:meta/meta.dart';
 
 import 'concept.dart';
@@ -6,19 +7,20 @@ import 'quiz_item.dart';
 /// A single sub-concept entry within a split suggestion.
 @immutable
 class SubConceptEntry {
-  const SubConceptEntry({
+  SubConceptEntry({
     required this.concept,
-    required this.quizItems,
-  });
+    List<QuizItem> quizItems = const [],
+  }) : quizItems = IList(quizItems);
 
   final Concept concept;
-  final List<QuizItem> quizItems;
+  final IList<QuizItem> quizItems;
 }
 
 /// Claude's suggestion for splitting a parent concept into sub-concepts.
 @immutable
 class SubConceptSuggestion {
-  const SubConceptSuggestion({required this.entries});
+  SubConceptSuggestion({List<SubConceptEntry> entries = const []})
+      : entries = IList(entries);
 
-  final List<SubConceptEntry> entries;
+  final IList<SubConceptEntry> entries;
 }

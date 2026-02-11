@@ -27,7 +27,9 @@ class Concept {
       name: json['name'] as String,
       description: json['description'] as String,
       sourceDocumentId: json['sourceDocumentId'] as String,
-      tags: (json['tags'] as List<dynamic>?)?.cast<String>().lock ??
+      tags: (json['tags'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toIList() ??
           const IListConst([]),
       parentConceptId: json['parentConceptId'] as String?,
     );

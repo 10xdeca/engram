@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/quiz_session_state.dart';
 import '../../providers/graph_analysis_provider.dart';
-import '../../providers/knowledge_graph_provider.dart';
+import '../../providers/graph_structure_provider.dart';
 
 class SessionSummary extends ConsumerWidget {
   const SessionSummary({
@@ -19,7 +19,7 @@ class SessionSummary extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final analyzer = ref.watch(graphAnalysisProvider);
-    final graph = ref.watch(knowledgeGraphProvider).valueOrNull;
+    final graph = ref.watch(graphStructureProvider);
 
     // Find locked concepts that are close to unlocking
     // (all prerequisites mastered except concepts reviewed in this session)

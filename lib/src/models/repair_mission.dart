@@ -29,12 +29,14 @@ class RepairMission {
   factory RepairMission.fromJson(Map<String, dynamic> json) {
     return RepairMission._raw(
       id: json['id'] as String,
-      conceptIds:
-          (json['conceptIds'] as List<dynamic>?)?.cast<String>().lock ??
-              const IListConst([]),
-      reviewedConceptIds:
-          (json['reviewedConceptIds'] as List<dynamic>?)?.cast<String>().lock ??
-              const IListConst([]),
+      conceptIds: (json['conceptIds'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toIList() ??
+          const IListConst([]),
+      reviewedConceptIds: (json['reviewedConceptIds'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toIList() ??
+          const IListConst([]),
       createdAt: json['createdAt'] as String,
       completedAt: json['completedAt'] as String?,
       catastropheEventId: json['catastropheEventId'] as String?,

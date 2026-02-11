@@ -18,13 +18,16 @@ class QuizScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(quizSessionProvider);
-    final graphAsync = ref.watch(knowledgeGraphProvider);
+    final hasItems = ref.watch(
+      knowledgeGraphProvider.select(
+          (av) => av.valueOrNull?.quizItems.isNotEmpty ?? false),
+    );
 
     return Scaffold(
       appBar: AppBar(title: const Text('Quiz')),
       body: switch (session.phase) {
         QuizPhase.idle => _IdleView(
-            hasItems: graphAsync.valueOrNull?.quizItems.isNotEmpty ?? false,
+            hasItems: hasItems,
             isComeback: session.isComeback,
             daysSinceLastSession: session.daysSinceLastSession,
             onStart: (mode) =>
