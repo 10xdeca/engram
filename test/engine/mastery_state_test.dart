@@ -10,16 +10,16 @@ import 'package:test/test.dart';
 void main() {
   group('masteryStateOf', () {
     test('locked when prerequisites not mastered', () {
-      const graph = KnowledgeGraph(
+      final graph = KnowledgeGraph(
         concepts: [
           Concept(id: 'prereq', name: 'P', description: 'D', sourceDocumentId: 'doc1'),
           Concept(id: 'dep', name: 'D', description: 'D', sourceDocumentId: 'doc1'),
         ],
         relationships: [
-          Relationship(id: 'r1', fromConceptId: 'dep', toConceptId: 'prereq', label: 'depends on'),
+          const Relationship(id: 'r1', fromConceptId: 'dep', toConceptId: 'prereq', label: 'depends on'),
         ],
         quizItems: [
-          QuizItem(id: 'q1', conceptId: 'prereq', question: 'Q?', answer: 'A.',
+          const QuizItem(id: 'q1', conceptId: 'prereq', question: 'Q?', answer: 'A.',
               easeFactor: 2.5, interval: 0, repetitions: 0,
               nextReview: '2020-01-01T00:00:00.000Z', lastReview: null),
         ],
@@ -33,12 +33,12 @@ void main() {
     });
 
     test('due when unlocked but no reviews', () {
-      const graph = KnowledgeGraph(
+      final graph = KnowledgeGraph(
         concepts: [
           Concept(id: 'c1', name: 'C', description: 'D', sourceDocumentId: 'doc1'),
         ],
         quizItems: [
-          QuizItem(id: 'q1', conceptId: 'c1', question: 'Q?', answer: 'A.',
+          const QuizItem(id: 'q1', conceptId: 'c1', question: 'Q?', answer: 'A.',
               easeFactor: 2.5, interval: 0, repetitions: 0,
               nextReview: '2020-01-01T00:00:00.000Z', lastReview: null),
         ],
@@ -52,12 +52,12 @@ void main() {
     });
 
     test('learning when reviewed but interval < 21', () {
-      const graph = KnowledgeGraph(
+      final graph = KnowledgeGraph(
         concepts: [
           Concept(id: 'c1', name: 'C', description: 'D', sourceDocumentId: 'doc1'),
         ],
         quizItems: [
-          QuizItem(id: 'q1', conceptId: 'c1', question: 'Q?', answer: 'A.',
+          const QuizItem(id: 'q1', conceptId: 'c1', question: 'Q?', answer: 'A.',
               easeFactor: 2.5, interval: 6, repetitions: 2,
               nextReview: '2099-01-01T00:00:00.000Z', lastReview: null),
         ],
@@ -74,7 +74,7 @@ void main() {
       final now = DateTime.utc(2025, 6, 15);
       final recentReview = DateTime.utc(2025, 6, 10).toIso8601String();
       final graph = KnowledgeGraph(
-        concepts: const [
+        concepts: [
           Concept(id: 'c1', name: 'C', description: 'D', sourceDocumentId: 'doc1'),
         ],
         quizItems: [
@@ -92,12 +92,12 @@ void main() {
     });
 
     test('mastered when interval >= 21 and no lastReview', () {
-      const graph = KnowledgeGraph(
+      final graph = KnowledgeGraph(
         concepts: [
           Concept(id: 'c1', name: 'C', description: 'D', sourceDocumentId: 'doc1'),
         ],
         quizItems: [
-          QuizItem(id: 'q1', conceptId: 'c1', question: 'Q?', answer: 'A.',
+          const QuizItem(id: 'q1', conceptId: 'c1', question: 'Q?', answer: 'A.',
               easeFactor: 2.5, interval: 25, repetitions: 5,
               nextReview: '2099-01-01T00:00:00.000Z', lastReview: null),
         ],
@@ -114,7 +114,7 @@ void main() {
       final now = DateTime.utc(2025, 6, 15);
       final oldReview = DateTime.utc(2025, 5, 1).toIso8601String(); // 45 days ago
       final graph = KnowledgeGraph(
-        concepts: const [
+        concepts: [
           Concept(id: 'c1', name: 'C', description: 'D', sourceDocumentId: 'doc1'),
         ],
         quizItems: [
@@ -132,7 +132,7 @@ void main() {
     });
 
     test('mastered when no quiz items (informational node)', () {
-      const graph = KnowledgeGraph(
+      final graph = KnowledgeGraph(
         concepts: [
           Concept(id: 'c1', name: 'C', description: 'D', sourceDocumentId: 'doc1'),
         ],
@@ -150,7 +150,7 @@ void main() {
     test('returns 1.0 for just reviewed (0 days)', () {
       final now = DateTime.utc(2025, 6, 15);
       final graph = KnowledgeGraph(
-        concepts: const [
+        concepts: [
           Concept(id: 'c1', name: 'C', description: 'D', sourceDocumentId: 'doc1'),
         ],
         quizItems: [
@@ -171,7 +171,7 @@ void main() {
       final now = DateTime.utc(2025, 6, 15);
       final thirtyDaysAgo = DateTime.utc(2025, 5, 16).toIso8601String();
       final graph = KnowledgeGraph(
-        concepts: const [
+        concepts: [
           Concept(id: 'c1', name: 'C', description: 'D', sourceDocumentId: 'doc1'),
         ],
         quizItems: [
@@ -192,7 +192,7 @@ void main() {
       final now = DateTime.utc(2025, 6, 15);
       final sixtyDaysAgo = DateTime.utc(2025, 4, 16).toIso8601String();
       final graph = KnowledgeGraph(
-        concepts: const [
+        concepts: [
           Concept(id: 'c1', name: 'C', description: 'D', sourceDocumentId: 'doc1'),
         ],
         quizItems: [
@@ -210,12 +210,12 @@ void main() {
     });
 
     test('returns 1.0 when no lastReview', () {
-      const graph = KnowledgeGraph(
+      final graph = KnowledgeGraph(
         concepts: [
           Concept(id: 'c1', name: 'C', description: 'D', sourceDocumentId: 'doc1'),
         ],
         quizItems: [
-          QuizItem(id: 'q1', conceptId: 'c1', question: 'Q?', answer: 'A.',
+          const QuizItem(id: 'q1', conceptId: 'c1', question: 'Q?', answer: 'A.',
               easeFactor: 2.5, interval: 0, repetitions: 0,
               nextReview: '2020-01-01T00:00:00.000Z', lastReview: null),
         ],

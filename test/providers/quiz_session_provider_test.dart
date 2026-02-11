@@ -98,7 +98,7 @@ void main() {
     });
 
     test('startSession with no due items goes to summary', () async {
-      final container = await createContainer(const KnowledgeGraph(
+      final container = await createContainer(KnowledgeGraph(
         concepts: [
           Concept(
             id: 'c1',
@@ -108,7 +108,7 @@ void main() {
           ),
         ],
         quizItems: [
-          QuizItem(
+          const QuizItem(
             id: 'q1',
             conceptId: 'c1',
             question: 'Q?',

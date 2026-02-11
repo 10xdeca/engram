@@ -1,22 +1,35 @@
+import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:meta/meta.dart';
 
 @immutable
 class Concept {
-  const Concept({
+  Concept({
     required this.id,
     required this.name,
     required this.description,
     required this.sourceDocumentId,
-    this.tags = const [],
+    List<String> tags = const [],
+    this.parentConceptId,
+  }) : tags = IList(tags);
+
+  const Concept._raw({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.sourceDocumentId,
+    required this.tags,
+    this.parentConceptId,
   });
 
   factory Concept.fromJson(Map<String, dynamic> json) {
-    return Concept(
+    return Concept._raw(
       id: json['id'] as String,
       name: json['name'] as String,
       description: json['description'] as String,
       sourceDocumentId: json['sourceDocumentId'] as String,
-      tags: (json['tags'] as List<dynamic>?)?.cast<String>() ?? const [],
+      tags: (json['tags'] as List<dynamic>?)?.cast<String>().lock ??
+          const IListConst([]),
+      parentConceptId: json['parentConceptId'] as String?,
     );
   }
 
@@ -24,14 +37,18 @@ class Concept {
   final String name;
   final String description;
   final String sourceDocumentId;
-  final List<String> tags;
+  final IList<String> tags;
+  final String? parentConceptId;
+
+  bool get isSubConcept => parentConceptId != null;
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
         'description': description,
         'sourceDocumentId': sourceDocumentId,
-        'tags': tags,
+        'tags': tags.toList(),
+        if (parentConceptId != null) 'parentConceptId': parentConceptId,
       };
 
   @override
@@ -42,12 +59,13 @@ class Concept {
   int get hashCode => id.hashCode;
 
   Concept withSourceDocumentId(String sourceDocumentId) {
-    return Concept(
+    return Concept._raw(
       id: id,
       name: name,
       description: description,
       sourceDocumentId: sourceDocumentId,
       tags: tags,
+      parentConceptId: parentConceptId,
     );
   }
 

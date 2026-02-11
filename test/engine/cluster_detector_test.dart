@@ -7,13 +7,13 @@ import 'package:test/test.dart';
 void main() {
   group('ClusterDetector', () {
     test('returns empty for empty graph', () {
-      const graph = KnowledgeGraph();
+      final graph = KnowledgeGraph();
       final clusters = ClusterDetector(graph).detect();
       expect(clusters, isEmpty);
     });
 
     test('each isolated node gets its own cluster', () {
-      const graph = KnowledgeGraph(
+      final graph = KnowledgeGraph(
         concepts: [
           Concept(id: 'a', name: 'A', description: '', sourceDocumentId: 'd'),
           Concept(id: 'b', name: 'B', description: '', sourceDocumentId: 'd'),
@@ -26,15 +26,15 @@ void main() {
     });
 
     test('connected components merge into one cluster', () {
-      const graph = KnowledgeGraph(
+      final graph = KnowledgeGraph(
         concepts: [
           Concept(id: 'a', name: 'A', description: '', sourceDocumentId: 'd'),
           Concept(id: 'b', name: 'B', description: '', sourceDocumentId: 'd'),
           Concept(id: 'c', name: 'C', description: '', sourceDocumentId: 'd'),
         ],
         relationships: [
-          Relationship(id: 'r1', fromConceptId: 'a', toConceptId: 'b', label: 'relates to'),
-          Relationship(id: 'r2', fromConceptId: 'b', toConceptId: 'c', label: 'relates to'),
+          const Relationship(id: 'r1', fromConceptId: 'a', toConceptId: 'b', label: 'relates to'),
+          const Relationship(id: 'r2', fromConceptId: 'b', toConceptId: 'c', label: 'relates to'),
         ],
       );
 
@@ -44,7 +44,7 @@ void main() {
     });
 
     test('detects two separate clusters', () {
-      const graph = KnowledgeGraph(
+      final graph = KnowledgeGraph(
         concepts: [
           Concept(id: 'a', name: 'A', description: '', sourceDocumentId: 'd'),
           Concept(id: 'b', name: 'B', description: '', sourceDocumentId: 'd'),
@@ -52,8 +52,8 @@ void main() {
           Concept(id: 'y', name: 'Y', description: '', sourceDocumentId: 'd'),
         ],
         relationships: [
-          Relationship(id: 'r1', fromConceptId: 'a', toConceptId: 'b', label: 'relates to'),
-          Relationship(id: 'r2', fromConceptId: 'x', toConceptId: 'y', label: 'relates to'),
+          const Relationship(id: 'r1', fromConceptId: 'a', toConceptId: 'b', label: 'relates to'),
+          const Relationship(id: 'r2', fromConceptId: 'x', toConceptId: 'y', label: 'relates to'),
         ],
       );
 
@@ -67,7 +67,7 @@ void main() {
 
     test('cluster label is the most-connected concept name', () {
       // Hub 'b' has degree 3, others have degree 1
-      const graph = KnowledgeGraph(
+      final graph = KnowledgeGraph(
         concepts: [
           Concept(id: 'a', name: 'Leaf-A', description: '', sourceDocumentId: 'd'),
           Concept(id: 'b', name: 'Hub-B', description: '', sourceDocumentId: 'd'),
@@ -75,9 +75,9 @@ void main() {
           Concept(id: 'd', name: 'Leaf-D', description: '', sourceDocumentId: 'd'),
         ],
         relationships: [
-          Relationship(id: 'r1', fromConceptId: 'a', toConceptId: 'b', label: 'relates to'),
-          Relationship(id: 'r2', fromConceptId: 'c', toConceptId: 'b', label: 'relates to'),
-          Relationship(id: 'r3', fromConceptId: 'd', toConceptId: 'b', label: 'relates to'),
+          const Relationship(id: 'r1', fromConceptId: 'a', toConceptId: 'b', label: 'relates to'),
+          const Relationship(id: 'r2', fromConceptId: 'c', toConceptId: 'b', label: 'relates to'),
+          const Relationship(id: 'r3', fromConceptId: 'd', toConceptId: 'b', label: 'relates to'),
         ],
       );
 
@@ -87,15 +87,15 @@ void main() {
     });
 
     test('deterministic: same graph produces same clusters', () {
-      const graph = KnowledgeGraph(
+      final graph = KnowledgeGraph(
         concepts: [
           Concept(id: 'a', name: 'A', description: '', sourceDocumentId: 'd'),
           Concept(id: 'b', name: 'B', description: '', sourceDocumentId: 'd'),
           Concept(id: 'c', name: 'C', description: '', sourceDocumentId: 'd'),
         ],
         relationships: [
-          Relationship(id: 'r1', fromConceptId: 'a', toConceptId: 'b', label: 'relates to'),
-          Relationship(id: 'r2', fromConceptId: 'b', toConceptId: 'c', label: 'relates to'),
+          const Relationship(id: 'r1', fromConceptId: 'a', toConceptId: 'b', label: 'relates to'),
+          const Relationship(id: 'r2', fromConceptId: 'b', toConceptId: 'c', label: 'relates to'),
         ],
       );
 
@@ -111,7 +111,7 @@ void main() {
     });
 
     test('single concept returns one cluster', () {
-      const graph = KnowledgeGraph(
+      final graph = KnowledgeGraph(
         concepts: [
           Concept(id: 'a', name: 'A', description: '', sourceDocumentId: 'd'),
         ],

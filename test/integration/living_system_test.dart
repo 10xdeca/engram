@@ -38,7 +38,7 @@ KnowledgeGraph buildDependencyGraph({
   int kubernetesReps = 0,
 }) {
   return KnowledgeGraph(
-    concepts: const [
+    concepts: [
       Concept(
         id: 'docker',
         name: 'Docker',
@@ -58,14 +58,14 @@ KnowledgeGraph buildDependencyGraph({
         sourceDocumentId: 'doc1',
       ),
     ],
-    relationships: const [
-      Relationship(
+    relationships: [
+      const Relationship(
         id: 'r1',
         fromConceptId: 'kubernetes',
         toConceptId: 'docker',
         label: 'depends on',
       ),
-      Relationship(
+      const Relationship(
         id: 'r2',
         fromConceptId: 'helm',
         toConceptId: 'kubernetes',

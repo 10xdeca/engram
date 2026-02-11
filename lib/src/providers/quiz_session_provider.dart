@@ -20,7 +20,7 @@ final quizSessionProvider =
 
 class QuizSessionNotifier extends Notifier<QuizSessionState> {
   @override
-  QuizSessionState build() => const QuizSessionState();
+  QuizSessionState build() => QuizSessionState();
 
   void startSession({SessionMode mode = SessionMode.full}) {
     final graph = ref.read(knowledgeGraphProvider).valueOrNull;
@@ -109,7 +109,7 @@ class QuizSessionNotifier extends Notifier<QuizSessionState> {
       }
     }
 
-    final newRatings = [...state.ratings, quality];
+    final newRatings = state.ratings.add(quality);
     final nextIndex = state.currentIndex + 1;
 
     if (nextIndex >= state.items.length) {
@@ -146,6 +146,6 @@ class QuizSessionNotifier extends Notifier<QuizSessionState> {
   }
 
   void reset() {
-    state = const QuizSessionState();
+    state = QuizSessionState();
   }
 }

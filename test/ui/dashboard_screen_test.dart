@@ -35,7 +35,7 @@ void main() {
 
     testWidgets('shows stats when graph has data', (tester) async {
       final graph = KnowledgeGraph(
-        concepts: const [
+        concepts: [
           Concept(
             id: 'c1',
             name: 'Docker',
@@ -49,8 +49,8 @@ void main() {
             sourceDocumentId: 'doc1',
           ),
         ],
-        relationships: const [
-          Relationship(
+        relationships: [
+          const Relationship(
             id: 'r1',
             fromConceptId: 'c2',
             toConceptId: 'c1',
@@ -77,7 +77,7 @@ void main() {
 
     testWidgets('shows graph status section', (tester) async {
       final graph = KnowledgeGraph(
-        concepts: const [
+        concepts: [
           Concept(
             id: 'c1',
             name: 'Docker',

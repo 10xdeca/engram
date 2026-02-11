@@ -16,10 +16,13 @@ import 'mastery_state.dart';
 /// graph — many other concepts depend on them, so their decay has outsized
 /// impact on the team's ability to learn.
 class NetworkHealthScorer {
-  NetworkHealthScorer(this._graph, {DateTime? now}) : _now = now;
+  NetworkHealthScorer(this._graph, {DateTime? now, List<ConceptCluster>? clusters})
+      : _now = now,
+        _clusters = clusters;
 
   final KnowledgeGraph _graph;
   final DateTime? _now;
+  final List<ConceptCluster>? _clusters;
 
   /// Minimum out-degree for a concept to be considered a critical path node.
   static const criticalPathThreshold = 2;
@@ -89,7 +92,7 @@ class NetworkHealthScorer {
     final rawScore = (base * criticalPenalty).clamp(0.0, 1.0);
 
     // Per-cluster health
-    final clusters = ClusterDetector(_graph).detect();
+    final clusters = _clusters ?? ClusterDetector(_graph).detect();
     final clusterHealth = _computeClusterHealth(clusters, analyzer);
 
     return NetworkHealth(

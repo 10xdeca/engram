@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../engine/network_health_scorer.dart';
 import '../models/network_health.dart';
+import 'cluster_provider.dart';
 import 'knowledge_graph_provider.dart';
 
 /// Provides the current [NetworkHealth] derived from the knowledge graph.
@@ -15,5 +16,6 @@ final networkHealthProvider = Provider<NetworkHealth>((ref) {
   if (graph == null || graph.concepts.isEmpty) {
     return const NetworkHealth(score: 1.0, tier: HealthTier.healthy);
   }
-  return NetworkHealthScorer(graph).score();
+  final clusters = ref.watch(clusterProvider);
+  return NetworkHealthScorer(graph, clusters: clusters).score();
 });

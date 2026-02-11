@@ -4,6 +4,7 @@ import '../models/concept.dart';
 import '../models/knowledge_graph.dart';
 import '../models/quiz_item.dart';
 import '../models/relationship.dart';
+import '../models/sub_concept_suggestion.dart';
 
 const _systemPrompt = '''
 You are a knowledge extraction engine. Given a wiki document, extract:
@@ -119,6 +120,76 @@ const _extractionTool = Tool.custom(
   },
 );
 
+const _splitSystemPrompt = '''
+You are a knowledge decomposition engine. Given a concept and its quiz question/answer, suggest how to split it into smaller, independently masterable sub-concepts.
+
+Guidelines:
+- Split into 2-4 sub-concepts, each covering a distinct aspect.
+- Each sub-concept should be independently understandable and testable.
+- Sub-concept IDs must extend the parent ID (e.g. parent "docker-compose" → children "docker-compose-services", "docker-compose-volumes").
+- Create 1-2 quiz items per sub-concept that test understanding of that specific aspect.
+- Use clear, concise language. Answers should be 1-3 sentences.
+''';
+
+const _splitToolName = 'suggest_sub_concepts';
+
+const _splitTool = Tool.custom(
+  name: _splitToolName,
+  description:
+      'Suggest how to split a concept into smaller sub-concepts with quiz items.',
+  inputSchema: {
+    'type': 'object',
+    'required': ['subConcepts'],
+    'properties': {
+      'subConcepts': {
+        'type': 'array',
+        'description': 'The suggested sub-concepts.',
+        'items': {
+          'type': 'object',
+          'required': ['id', 'name', 'description', 'quizItems'],
+          'properties': {
+            'id': {
+              'type': 'string',
+              'description':
+                  'Unique ID extending the parent ID, e.g. "parent-id-aspect"',
+            },
+            'name': {
+              'type': 'string',
+              'description': 'Human-readable sub-concept name',
+            },
+            'description': {
+              'type': 'string',
+              'description': '1-3 sentence description',
+            },
+            'quizItems': {
+              'type': 'array',
+              'description': 'Quiz items for this sub-concept.',
+              'items': {
+                'type': 'object',
+                'required': ['id', 'question', 'answer'],
+                'properties': {
+                  'id': {
+                    'type': 'string',
+                    'description': 'Unique quiz item ID',
+                  },
+                  'question': {
+                    'type': 'string',
+                    'description': 'The question to ask',
+                  },
+                  'answer': {
+                    'type': 'string',
+                    'description': 'The expected answer (1-3 sentences)',
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+);
+
 class ExtractionService {
   ExtractionService({
     required String apiKey,
@@ -182,6 +253,100 @@ class ExtractionService {
     }
 
     return _parseResult(toolInput, documentTitle);
+  }
+
+  /// Ask Claude to suggest sub-concepts for splitting a parent concept.
+  Future<SubConceptSuggestion> generateSubConcepts({
+    required String parentConceptId,
+    required String parentName,
+    required String parentDescription,
+    required String quizQuestion,
+    required String quizAnswer,
+    required String sourceDocumentId,
+  }) async {
+    final response = await _client.createMessage(
+      request: CreateMessageRequest(
+        model: const Model.modelId('claude-sonnet-4-5-20250929'),
+        maxTokens: 4096,
+        system: const CreateMessageRequestSystem.text(_splitSystemPrompt),
+        tools: [_splitTool],
+        toolChoice: const ToolChoice(
+          type: ToolChoiceType.tool,
+          name: _splitToolName,
+        ),
+        messages: [
+          Message(
+            role: MessageRole.user,
+            content: MessageContent.text(
+              'Split this concept into sub-concepts.\n\n'
+              'Concept ID: $parentConceptId\n'
+              'Concept name: $parentName\n'
+              'Description: $parentDescription\n\n'
+              'Quiz question: $quizQuestion\n'
+              'Quiz answer: $quizAnswer',
+            ),
+          ),
+        ],
+      ),
+    );
+
+    // Find the tool use block
+    final content = response.content;
+    Map<String, dynamic>? toolInput;
+
+    if (content case MessageContentBlocks(value: final blocks)) {
+      for (final block in blocks) {
+        if (block case ToolUseBlock(name: _splitToolName, :final input)) {
+          toolInput = input;
+          break;
+        }
+      }
+    }
+
+    if (toolInput == null) {
+      throw ExtractionException(
+        'Claude did not return a tool use block for $_splitToolName',
+      );
+    }
+
+    return _parseSplitResult(toolInput, parentConceptId, sourceDocumentId);
+  }
+
+  SubConceptSuggestion _parseSplitResult(
+    Map<String, dynamic> input,
+    String parentConceptId,
+    String sourceDocumentId,
+  ) {
+    final subConcepts = input['subConcepts'] as List<dynamic>? ?? [];
+
+    final entries = <SubConceptEntry>[];
+    for (final sc in subConcepts) {
+      final map = sc as Map<String, dynamic>;
+      final conceptId = map['id'] as String;
+
+      final concept = Concept(
+        id: conceptId,
+        name: map['name'] as String,
+        description: map['description'] as String,
+        sourceDocumentId: sourceDocumentId,
+        parentConceptId: parentConceptId,
+      );
+
+      final quizItemsList = map['quizItems'] as List<dynamic>? ?? [];
+      final quizItems = quizItemsList.map((q) {
+        final qMap = q as Map<String, dynamic>;
+        return QuizItem.newCard(
+          id: qMap['id'] as String,
+          conceptId: conceptId,
+          question: qMap['question'] as String,
+          answer: qMap['answer'] as String,
+        );
+      }).toList();
+
+      entries.add(SubConceptEntry(concept: concept, quizItems: quizItems));
+    }
+
+    return SubConceptSuggestion(entries: entries);
   }
 
   ExtractionResult _parseResult(

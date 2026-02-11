@@ -1,3 +1,4 @@
+import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:meta/meta.dart';
 
 import 'network_health.dart';
@@ -5,7 +6,16 @@ import 'network_health.dart';
 /// A recorded catastrophe event in the team's history.
 @immutable
 class CatastropheEvent {
-  const CatastropheEvent({
+  CatastropheEvent({
+    required this.id,
+    required this.tier,
+    List<String> affectedConceptIds = const [],
+    required this.createdAt,
+    this.resolvedAt,
+    this.clusterLabel,
+  }) : affectedConceptIds = IList(affectedConceptIds);
+
+  const CatastropheEvent._raw({
     required this.id,
     required this.tier,
     required this.affectedConceptIds,
@@ -15,12 +25,12 @@ class CatastropheEvent {
   });
 
   factory CatastropheEvent.fromJson(Map<String, dynamic> json) {
-    return CatastropheEvent(
+    return CatastropheEvent._raw(
       id: json['id'] as String,
       tier: HealthTier.values.byName(json['tier'] as String),
-      affectedConceptIds: (json['affectedConceptIds'] as List<dynamic>?)
-              ?.cast<String>() ??
-          const [],
+      affectedConceptIds:
+          (json['affectedConceptIds'] as List<dynamic>?)?.cast<String>().lock ??
+              const IListConst([]),
       createdAt: json['createdAt'] as String,
       resolvedAt: json['resolvedAt'] as String?,
       clusterLabel: json['clusterLabel'] as String?,
@@ -29,14 +39,14 @@ class CatastropheEvent {
 
   final String id;
   final HealthTier tier;
-  final List<String> affectedConceptIds;
+  final IList<String> affectedConceptIds;
   final String createdAt;
   final String? resolvedAt;
   final String? clusterLabel;
 
   bool get isResolved => resolvedAt != null;
 
-  CatastropheEvent withResolved(String timestamp) => CatastropheEvent(
+  CatastropheEvent withResolved(String timestamp) => CatastropheEvent._raw(
         id: id,
         tier: tier,
         affectedConceptIds: affectedConceptIds,
@@ -48,7 +58,7 @@ class CatastropheEvent {
   Map<String, dynamic> toJson() => {
         'id': id,
         'tier': tier.name,
-        'affectedConceptIds': affectedConceptIds,
+        'affectedConceptIds': affectedConceptIds.toList(),
         'createdAt': createdAt,
         'resolvedAt': resolvedAt,
         'clusterLabel': clusterLabel,

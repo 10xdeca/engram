@@ -51,7 +51,7 @@ void main() {
     });
 
     test('build loads existing graph from disk', () async {
-      const graph = KnowledgeGraph(
+      final graph = KnowledgeGraph(
         concepts: [
           Concept(
             id: 'c1',
@@ -105,7 +105,7 @@ void main() {
 
       final result = ExtractionResult(
         concepts: [
-          const Concept(
+          Concept(
             id: 'c1',
             name: 'Docker',
             description: 'Container runtime',

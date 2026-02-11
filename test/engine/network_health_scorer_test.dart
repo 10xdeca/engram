@@ -13,7 +13,7 @@ void main() {
     final oldReview = DateTime.utc(2025, 4, 1).toIso8601String();
 
     test('empty graph returns healthy with score 1.0', () {
-      const graph = KnowledgeGraph();
+      final graph = KnowledgeGraph();
       final health = NetworkHealthScorer(graph, now: now).score();
 
       expect(health.score, 1.0);
@@ -22,7 +22,7 @@ void main() {
 
     test('all mastered and fresh returns high score', () {
       final graph = KnowledgeGraph(
-        concepts: const [
+        concepts: [
           Concept(id: 'a', name: 'A', description: '', sourceDocumentId: 'd'),
           Concept(id: 'b', name: 'B', description: '', sourceDocumentId: 'd'),
         ],
@@ -51,18 +51,18 @@ void main() {
     });
 
     test('all due returns low score', () {
-      const graph = KnowledgeGraph(
+      final graph = KnowledgeGraph(
         concepts: [
           Concept(id: 'a', name: 'A', description: '', sourceDocumentId: 'd'),
           Concept(id: 'b', name: 'B', description: '', sourceDocumentId: 'd'),
         ],
         quizItems: [
-          QuizItem(
+          const QuizItem(
             id: 'q1', conceptId: 'a', question: 'Q?', answer: 'A.',
             easeFactor: 2.5, interval: 0, repetitions: 0,
             nextReview: '2020-01-01', lastReview: null,
           ),
-          QuizItem(
+          const QuizItem(
             id: 'q2', conceptId: 'b', question: 'Q?', answer: 'A.',
             easeFactor: 2.5, interval: 0, repetitions: 0,
             nextReview: '2020-01-01', lastReview: null,
@@ -80,7 +80,7 @@ void main() {
 
     test('mixed state produces intermediate score', () {
       final graph = KnowledgeGraph(
-        concepts: const [
+        concepts: [
           Concept(id: 'a', name: 'A', description: '', sourceDocumentId: 'd'),
           Concept(id: 'b', name: 'B', description: '', sourceDocumentId: 'd'),
           Concept(id: 'c', name: 'C', description: '', sourceDocumentId: 'd'),
@@ -124,7 +124,7 @@ void main() {
     });
 
     test('critical path penalty reduces score', () {
-      const graph = KnowledgeGraph(
+      final graph = KnowledgeGraph(
         concepts: [
           Concept(id: 'hub', name: 'Hub', description: '', sourceDocumentId: 'd'),
           Concept(id: 'dep1', name: 'Dep1', description: '', sourceDocumentId: 'd'),
@@ -132,23 +132,23 @@ void main() {
         ],
         relationships: [
           // dep1 and dep2 both depend on hub → hub has out-degree 2
-          Relationship(id: 'r1', fromConceptId: 'dep1', toConceptId: 'hub', label: 'depends on'),
-          Relationship(id: 'r2', fromConceptId: 'dep2', toConceptId: 'hub', label: 'depends on'),
+          const Relationship(id: 'r1', fromConceptId: 'dep1', toConceptId: 'hub', label: 'depends on'),
+          const Relationship(id: 'r2', fromConceptId: 'dep2', toConceptId: 'hub', label: 'depends on'),
         ],
         quizItems: [
           // hub: due (at-risk critical path!)
-          QuizItem(
+          const QuizItem(
             id: 'q1', conceptId: 'hub', question: 'Q?', answer: 'A.',
             easeFactor: 2.5, interval: 0, repetitions: 0,
             nextReview: '2020-01-01', lastReview: null,
           ),
           // dep1, dep2: locked (because hub not mastered)
-          QuizItem(
+          const QuizItem(
             id: 'q2', conceptId: 'dep1', question: 'Q?', answer: 'A.',
             easeFactor: 2.5, interval: 0, repetitions: 0,
             nextReview: '2020-01-01', lastReview: null,
           ),
-          QuizItem(
+          const QuizItem(
             id: 'q3', conceptId: 'dep2', question: 'Q?', answer: 'A.',
             easeFactor: 2.5, interval: 0, repetitions: 0,
             nextReview: '2020-01-01', lastReview: null,
@@ -178,12 +178,12 @@ void main() {
 
     test('per-cluster health is computed', () {
       final graph = KnowledgeGraph(
-        concepts: const [
+        concepts: [
           Concept(id: 'a', name: 'A', description: '', sourceDocumentId: 'd'),
           Concept(id: 'b', name: 'B', description: '', sourceDocumentId: 'd'),
         ],
-        relationships: const [
-          Relationship(id: 'r1', fromConceptId: 'a', toConceptId: 'b', label: 'relates to'),
+        relationships: [
+          const Relationship(id: 'r1', fromConceptId: 'a', toConceptId: 'b', label: 'relates to'),
         ],
         quizItems: [
           QuizItem(

@@ -10,7 +10,7 @@ import 'package:test/test.dart';
 void main() {
   group('Concept', () {
     test('fromJson/toJson round-trips', () {
-      const concept = Concept(
+      final concept = Concept(
         id: 'test-concept',
         name: 'Test Concept',
         description: 'A test concept',
@@ -40,7 +40,7 @@ void main() {
     });
 
     test('withSourceDocumentId creates new instance', () {
-      const concept = Concept(
+      final concept = Concept(
         id: 'c1',
         name: 'C1',
         description: 'Desc',
@@ -169,7 +169,7 @@ void main() {
 
   group('KnowledgeGraph', () {
     test('empty graph serializes to empty lists', () {
-      const graph = KnowledgeGraph();
+      final graph = KnowledgeGraph();
       final json = graph.toJson();
 
       expect(json['concepts'], isEmpty);
@@ -180,7 +180,7 @@ void main() {
 
     test('full round-trip through JSON string', () {
       final graph = KnowledgeGraph(
-        concepts: const [
+        concepts: [
           Concept(
             id: 'c1',
             name: 'Concept 1',
@@ -188,8 +188,8 @@ void main() {
             sourceDocumentId: 'doc-1',
           ),
         ],
-        relationships: const [
-          Relationship(
+        relationships: [
+          const Relationship(
             id: 'r1',
             fromConceptId: 'c1',
             toConceptId: 'c1',
@@ -226,10 +226,10 @@ void main() {
     });
 
     test('withNewExtraction adds new data', () {
-      const graph = KnowledgeGraph();
+      final graph = KnowledgeGraph();
 
       final result = ExtractionResult(
-        concepts: const [
+        concepts: [
           Concept(
             id: 'c1',
             name: 'C1',
@@ -263,7 +263,7 @@ void main() {
 
     test('withNewExtraction replaces data from same document', () {
       final initial = KnowledgeGraph(
-        concepts: const [
+        concepts: [
           Concept(
             id: 'c1',
             name: 'Old',
@@ -290,7 +290,7 @@ void main() {
       );
 
       final result = ExtractionResult(
-        concepts: const [
+        concepts: [
           Concept(
             id: 'c2',
             name: 'New',
@@ -325,7 +325,7 @@ void main() {
 
     test('withNewExtraction preserves data from other documents', () {
       final initial = KnowledgeGraph(
-        concepts: const [
+        concepts: [
           Concept(
             id: 'c1',
             name: 'From Doc 1',
@@ -344,7 +344,7 @@ void main() {
       );
 
       final result = ExtractionResult(
-        concepts: const [
+        concepts: [
           Concept(
             id: 'c2',
             name: 'From Doc 2',

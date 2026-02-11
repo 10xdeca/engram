@@ -28,7 +28,7 @@ void main() {
 
     test('save and load round-trips', () async {
       final graph = KnowledgeGraph(
-        concepts: const [
+        concepts: [
           Concept(
             id: 'c1',
             name: 'Concept 1',
@@ -66,7 +66,7 @@ void main() {
 
     test('save is atomic (writes to temp then renames)', () async {
       // Save once
-      const graph = KnowledgeGraph(
+      final graph = KnowledgeGraph(
         concepts: [
           Concept(
             id: 'c1',
@@ -89,7 +89,7 @@ void main() {
     });
 
     test('watch emits loaded graph', () async {
-      const graph = KnowledgeGraph(
+      final graph = KnowledgeGraph(
         concepts: [
           Concept(
             id: 'c1',

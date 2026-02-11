@@ -1,3 +1,4 @@
+import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:meta/meta.dart';
 
@@ -26,17 +27,22 @@ final teamRepositoryProvider = Provider<TeamRepository?>((ref) {
 /// Guardian system state: cluster assignments and the current user's role.
 @immutable
 class GuardianState {
-  const GuardianState({
-    this.clusters = const [],
+  GuardianState({
+    List<ConceptCluster> clusters = const [],
+    this.currentUid,
+  }) : clusters = IList(clusters);
+
+  const GuardianState._raw({
+    required this.clusters,
     this.currentUid,
   });
 
-  final List<ConceptCluster> clusters;
+  final IList<ConceptCluster> clusters;
   final String? currentUid;
 
   /// Clusters guarded by the current user.
-  List<ConceptCluster> get myGuardedClusters =>
-      clusters.where((c) => c.guardianUid == currentUid).toList();
+  Iterable<ConceptCluster> get myGuardedClusters =>
+      clusters.where((c) => c.guardianUid == currentUid);
 
   /// Look up the guardian UID for a specific cluster label.
   String? guardianForCluster(String label) =>
@@ -46,8 +52,8 @@ class GuardianState {
     List<ConceptCluster>? clusters,
     String? currentUid,
   }) {
-    return GuardianState(
-      clusters: clusters ?? this.clusters,
+    return GuardianState._raw(
+      clusters: clusters != null ? IList(clusters) : this.clusters,
       currentUid: currentUid ?? this.currentUid,
     );
   }
@@ -68,7 +74,7 @@ class GuardianNotifier extends Notifier<GuardianState> {
     final teamRepo = ref.watch(teamRepositoryProvider);
 
     if (user == null || teamRepo == null) {
-      return const GuardianState();
+      return GuardianState();
     }
 
     // Stream clusters from Firestore

@@ -6,7 +6,7 @@ void main() {
     final now = DateTime.utc(2025, 6, 15, 12, 0);
 
     test('withReviewedConcept adds concept and passes caller timestamp', () {
-      const mission = RepairMission(
+      final mission = RepairMission(
         id: 'm1',
         conceptIds: ['a', 'b', 'c'],
         createdAt: '2025-06-15T00:00:00.000Z',
@@ -20,7 +20,7 @@ void main() {
     });
 
     test('withReviewedConcept sets completedAt on last concept', () {
-      const mission = RepairMission(
+      final mission = RepairMission(
         id: 'm1',
         conceptIds: ['a', 'b'],
         reviewedConceptIds: ['a'],
@@ -34,7 +34,7 @@ void main() {
     });
 
     test('withReviewedConcept ignores duplicate concept', () {
-      const mission = RepairMission(
+      final mission = RepairMission(
         id: 'm1',
         conceptIds: ['a', 'b'],
         reviewedConceptIds: ['a'],
@@ -47,7 +47,7 @@ void main() {
     });
 
     test('withReviewedConcept ignores concept not in conceptIds', () {
-      const mission = RepairMission(
+      final mission = RepairMission(
         id: 'm1',
         conceptIds: ['a', 'b'],
         createdAt: '2025-06-15T00:00:00.000Z',
@@ -59,7 +59,7 @@ void main() {
     });
 
     test('progress and remaining are correct', () {
-      const mission = RepairMission(
+      final mission = RepairMission(
         id: 'm1',
         conceptIds: ['a', 'b', 'c', 'd'],
         reviewedConceptIds: ['a'],
@@ -71,7 +71,7 @@ void main() {
     });
 
     test('JSON round-trip', () {
-      const mission = RepairMission(
+      final mission = RepairMission(
         id: 'm1',
         conceptIds: ['a', 'b'],
         reviewedConceptIds: ['a'],

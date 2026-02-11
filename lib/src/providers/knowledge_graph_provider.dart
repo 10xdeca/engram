@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/concept.dart';
 import '../models/knowledge_graph.dart';
 import '../models/quiz_item.dart';
+import '../models/relationship.dart';
 import 'graph_store_provider.dart';
 
 final knowledgeGraphProvider =
@@ -47,6 +49,25 @@ class KnowledgeGraphNotifier extends AsyncNotifier<KnowledgeGraph> {
       documentId: documentId,
       documentTitle: documentTitle,
       updatedAt: updatedAt,
+    );
+    state = AsyncData(newGraph);
+
+    final repo = ref.read(graphRepositoryProvider);
+    await repo.save(newGraph);
+  }
+
+  Future<void> splitConcept({
+    required List<Concept> children,
+    required List<Relationship> childRelationships,
+    required List<QuizItem> childQuizItems,
+  }) async {
+    final current = state.valueOrNull;
+    if (current == null) return;
+
+    final newGraph = current.withConceptSplit(
+      children: children,
+      childRelationships: childRelationships,
+      childQuizItems: childQuizItems,
     );
     state = AsyncData(newGraph);
 

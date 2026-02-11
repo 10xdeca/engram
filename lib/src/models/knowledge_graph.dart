@@ -1,3 +1,4 @@
+import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:meta/meta.dart';
 
 import 'concept.dart';
@@ -20,41 +21,51 @@ class ExtractionResult {
 
 @immutable
 class KnowledgeGraph {
-  const KnowledgeGraph({
-    this.concepts = const [],
-    this.relationships = const [],
-    this.quizItems = const [],
-    this.documentMetadata = const [],
+  KnowledgeGraph({
+    List<Concept> concepts = const [],
+    List<Relationship> relationships = const [],
+    List<QuizItem> quizItems = const [],
+    List<DocumentMetadata> documentMetadata = const [],
+  })  : concepts = IList(concepts),
+        relationships = IList(relationships),
+        quizItems = IList(quizItems),
+        documentMetadata = IList(documentMetadata);
+
+  const KnowledgeGraph._raw({
+    required this.concepts,
+    required this.relationships,
+    required this.quizItems,
+    required this.documentMetadata,
   });
 
   factory KnowledgeGraph.fromJson(Map<String, dynamic> json) {
-    return KnowledgeGraph(
+    return KnowledgeGraph._raw(
       concepts: (json['concepts'] as List<dynamic>?)
               ?.map((e) => Concept.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          const [],
+              .toIList() ??
+          const IListConst([]),
       relationships: (json['relationships'] as List<dynamic>?)
               ?.map((e) => Relationship.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          const [],
+              .toIList() ??
+          const IListConst([]),
       quizItems: (json['quizItems'] as List<dynamic>?)
               ?.map((e) => QuizItem.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          const [],
+              .toIList() ??
+          const IListConst([]),
       documentMetadata: (json['documentMetadata'] as List<dynamic>?)
               ?.map(
                   (e) => DocumentMetadata.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          const [],
+              .toIList() ??
+          const IListConst([]),
     );
   }
 
-  static const empty = KnowledgeGraph();
+  static final empty = KnowledgeGraph();
 
-  final List<Concept> concepts;
-  final List<Relationship> relationships;
-  final List<QuizItem> quizItems;
-  final List<DocumentMetadata> documentMetadata;
+  final IList<Concept> concepts;
+  final IList<Relationship> relationships;
+  final IList<QuizItem> quizItems;
+  final IList<DocumentMetadata> documentMetadata;
 
   /// Merge an extraction result into this graph, replacing data from the
   /// same document if it was previously ingested.
@@ -73,7 +84,7 @@ class KnowledgeGraph {
     final newConcepts = [
       ...concepts.where((c) => c.sourceDocumentId != documentId),
       ...result.concepts.map((c) => c.withSourceDocumentId(documentId)),
-    ];
+    ].lock;
 
     final newRelationships = [
       // Keep relationships not referencing old concepts from this doc
@@ -81,13 +92,13 @@ class KnowledgeGraph {
           !oldConceptIds.contains(r.fromConceptId) &&
           !oldConceptIds.contains(r.toConceptId)),
       ...result.relationships,
-    ];
+    ].lock;
 
     final newQuizItems = [
       // Keep quiz items not referencing old concepts from this doc
       ...quizItems.where((q) => !oldConceptIds.contains(q.conceptId)),
       ...result.quizItems,
-    ];
+    ].lock;
 
     // Update or add document metadata
     final existingIndex =
@@ -98,14 +109,11 @@ class KnowledgeGraph {
       updatedAt: updatedAt,
       ingestedAt: DateTime.now().toUtc().toIso8601String(),
     );
-    final newMetadata = [...documentMetadata];
-    if (existingIndex >= 0) {
-      newMetadata[existingIndex] = meta;
-    } else {
-      newMetadata.add(meta);
-    }
+    final newMetadata = existingIndex >= 0
+        ? documentMetadata.replace(existingIndex, meta)
+        : documentMetadata.add(meta);
 
-    return KnowledgeGraph(
+    return KnowledgeGraph._raw(
       concepts: newConcepts,
       relationships: newRelationships,
       quizItems: newQuizItems,
@@ -115,13 +123,28 @@ class KnowledgeGraph {
 
   /// Return a new graph with one quiz item replaced.
   KnowledgeGraph withUpdatedQuizItem(QuizItem updated) {
-    return KnowledgeGraph(
+    final idx = quizItems.indexWhere((item) => item.id == updated.id);
+    if (idx < 0) return this;
+    return KnowledgeGraph._raw(
       concepts: concepts,
       relationships: relationships,
-      quizItems: [
-        for (final item in quizItems)
-          if (item.id == updated.id) updated else item,
-      ],
+      quizItems: quizItems.replace(idx, updated),
+      documentMetadata: documentMetadata,
+    );
+  }
+
+  /// Add child concepts from a split operation. Purely additive — the parent
+  /// concept remains, children are added with "is part of" relationships,
+  /// and new quiz items are created for each child.
+  KnowledgeGraph withConceptSplit({
+    required List<Concept> children,
+    required List<Relationship> childRelationships,
+    required List<QuizItem> childQuizItems,
+  }) {
+    return KnowledgeGraph._raw(
+      concepts: concepts.addAll(children),
+      relationships: relationships.addAll(childRelationships),
+      quizItems: quizItems.addAll(childQuizItems),
       documentMetadata: documentMetadata,
     );
   }

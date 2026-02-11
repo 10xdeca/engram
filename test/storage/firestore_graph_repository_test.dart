@@ -21,7 +21,7 @@ void main() {
 
   KnowledgeGraph sampleGraph() {
     return KnowledgeGraph(
-      concepts: const [
+      concepts: [
         Concept(
           id: 'c1',
           name: 'Docker',
@@ -35,8 +35,8 @@ void main() {
           sourceDocumentId: 'doc1',
         ),
       ],
-      relationships: const [
-        Relationship(
+      relationships: [
+        const Relationship(
           id: 'r1',
           fromConceptId: 'c1',
           toConceptId: 'c2',
@@ -88,7 +88,7 @@ void main() {
       await repo.save(sampleGraph());
 
       // Save smaller graph
-      const smallGraph = KnowledgeGraph(
+      final smallGraph = KnowledgeGraph(
         concepts: [
           Concept(
             id: 'c3',

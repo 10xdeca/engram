@@ -1,3 +1,4 @@
+import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:meta/meta.dart';
 
 import 'quiz_item.dart';
@@ -7,20 +8,31 @@ enum QuizPhase { idle, question, revealed, summary }
 
 @immutable
 class QuizSessionState {
-  const QuizSessionState({
+  QuizSessionState({
     this.phase = QuizPhase.idle,
-    this.items = const [],
+    List<QuizItem> items = const [],
     this.currentIndex = 0,
-    this.ratings = const [],
+    List<int> ratings = const [],
     this.isComeback = false,
     this.sessionMode = SessionMode.full,
+    this.daysSinceLastSession,
+  })  : items = IList(items),
+        ratings = IList(ratings);
+
+  const QuizSessionState._raw({
+    required this.phase,
+    required this.items,
+    required this.currentIndex,
+    required this.ratings,
+    required this.isComeback,
+    required this.sessionMode,
     this.daysSinceLastSession,
   });
 
   final QuizPhase phase;
-  final List<QuizItem> items;
+  final IList<QuizItem> items;
   final int currentIndex;
-  final List<int> ratings;
+  final IList<int> ratings;
   final bool isComeback;
   final SessionMode sessionMode;
   final int? daysSinceLastSession;
@@ -39,14 +51,14 @@ class QuizSessionState {
 
   QuizSessionState copyWith({
     QuizPhase? phase,
-    List<QuizItem>? items,
+    IList<QuizItem>? items,
     int? currentIndex,
-    List<int>? ratings,
+    IList<int>? ratings,
     bool? isComeback,
     SessionMode? sessionMode,
     int? daysSinceLastSession,
   }) {
-    return QuizSessionState(
+    return QuizSessionState._raw(
       phase: phase ?? this.phase,
       items: items ?? this.items,
       currentIndex: currentIndex ?? this.currentIndex,

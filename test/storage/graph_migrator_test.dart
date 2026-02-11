@@ -18,7 +18,7 @@ void main() {
         userId: 'test-user',
       );
 
-      const graph = KnowledgeGraph(
+      final graph = KnowledgeGraph(
         concepts: [
           Concept(
             id: 'c1',

@@ -145,7 +145,7 @@ void main() {
             documentContent: any(named: 'documentContent'),
             existingConceptIds: any(named: 'existingConceptIds'),
           )).thenAnswer((_) async => ExtractionResult(
-            concepts: const [
+            concepts: [
               Concept(
                 id: 'docker',
                 name: 'Docker',
