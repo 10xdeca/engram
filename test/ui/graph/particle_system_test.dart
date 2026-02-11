@@ -10,13 +10,13 @@ import 'package:engram/src/ui/graph/particle_system.dart';
 import 'package:test/test.dart';
 
 List<GraphEdge> _makeEdges() {
-  const graph = KnowledgeGraph(
+  final graph = KnowledgeGraph(
     concepts: [
       Concept(id: 'a', name: 'A', description: '', sourceDocumentId: 'd'),
       Concept(id: 'b', name: 'B', description: '', sourceDocumentId: 'd'),
     ],
     relationships: [
-      Relationship(id: 'r1', fromConceptId: 'a', toConceptId: 'b', label: 'relates to'),
+      const Relationship(id: 'r1', fromConceptId: 'a', toConceptId: 'b', label: 'relates to'),
     ],
   );
 

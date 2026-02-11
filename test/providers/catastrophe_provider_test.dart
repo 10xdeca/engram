@@ -14,7 +14,7 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           knowledgeGraphProvider
-              .overrideWith(() => _PreloadedGraphNotifier(const KnowledgeGraph())),
+              .overrideWith(() => _PreloadedGraphNotifier(KnowledgeGraph())),
         ],
       );
       addTearDown(container.dispose);
@@ -30,7 +30,7 @@ void main() {
       // Start with healthy graph
       final recentReview = DateTime.utc(2025, 6, 10).toIso8601String();
       final healthyGraph = KnowledgeGraph(
-        concepts: const [
+        concepts: [
           Concept(id: 'a', name: 'A', description: '', sourceDocumentId: 'd'),
         ],
         quizItems: [
@@ -58,12 +58,12 @@ void main() {
       container.read(catastropheProvider);
 
       // Now degrade to an all-due graph
-      const degradedGraph = KnowledgeGraph(
+      final degradedGraph = KnowledgeGraph(
         concepts: [
           Concept(id: 'a', name: 'A', description: '', sourceDocumentId: 'd'),
         ],
         quizItems: [
-          QuizItem(
+          const QuizItem(
             id: 'q1', conceptId: 'a', question: 'Q?', answer: 'A.',
             easeFactor: 2.5, interval: 0, repetitions: 0,
             nextReview: '2020-01-01', lastReview: null,
@@ -87,7 +87,7 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           knowledgeGraphProvider
-              .overrideWith(() => _PreloadedGraphNotifier(const KnowledgeGraph())),
+              .overrideWith(() => _PreloadedGraphNotifier(KnowledgeGraph())),
         ],
       );
       addTearDown(container.dispose);
@@ -109,18 +109,18 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           knowledgeGraphProvider
-              .overrideWith(() => _PreloadedGraphNotifier(const KnowledgeGraph())),
+              .overrideWith(() => _PreloadedGraphNotifier(KnowledgeGraph())),
         ],
       );
       addTearDown(container.dispose);
 
       // Synchronously set a degraded graph (simulates app state after load)
-      const degradedGraph = KnowledgeGraph(
+      final degradedGraph = KnowledgeGraph(
         concepts: [
           Concept(id: 'a', name: 'A', description: '', sourceDocumentId: 'd'),
         ],
         quizItems: [
-          QuizItem(
+          const QuizItem(
             id: 'q1', conceptId: 'a', question: 'Q?', answer: 'A.',
             easeFactor: 2.5, interval: 0, repetitions: 0,
             nextReview: '2020-01-01', lastReview: null,
@@ -146,7 +146,7 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           knowledgeGraphProvider
-              .overrideWith(() => _PreloadedGraphNotifier(const KnowledgeGraph())),
+              .overrideWith(() => _PreloadedGraphNotifier(KnowledgeGraph())),
         ],
       );
       addTearDown(container.dispose);
@@ -155,18 +155,18 @@ void main() {
       container.read(catastropheProvider);
 
       // First degrade to cascade (score < 0.50)
-      const degradedGraph = KnowledgeGraph(
+      final degradedGraph = KnowledgeGraph(
         concepts: [
           Concept(id: 'a', name: 'A', description: '', sourceDocumentId: 'd'),
           Concept(id: 'b', name: 'B', description: '', sourceDocumentId: 'd'),
         ],
         quizItems: [
-          QuizItem(
+          const QuizItem(
             id: 'q1', conceptId: 'a', question: 'Q?', answer: 'A.',
             easeFactor: 2.5, interval: 0, repetitions: 0,
             nextReview: '2020-01-01', lastReview: null,
           ),
-          QuizItem(
+          const QuizItem(
             id: 'q2', conceptId: 'b', question: 'Q?', answer: 'A.',
             easeFactor: 2.5, interval: 0, repetitions: 0,
             nextReview: '2020-01-01', lastReview: null,
@@ -182,7 +182,7 @@ void main() {
       // Now improve back to healthy
       final recentReview = DateTime.utc(2025, 6, 10).toIso8601String();
       final healthyGraph = KnowledgeGraph(
-        concepts: const [
+        concepts: [
           Concept(id: 'a', name: 'A', description: '', sourceDocumentId: 'd'),
           Concept(id: 'b', name: 'B', description: '', sourceDocumentId: 'd'),
         ],

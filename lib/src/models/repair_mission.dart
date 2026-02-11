@@ -1,3 +1,4 @@
+import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:meta/meta.dart';
 
 /// A repair mission auto-generated after a network fracture (Tier 3).
@@ -6,23 +7,36 @@ import 'package:meta/meta.dart';
 /// islands. Concepts reviewed during an active mission earn 1.5x mastery credit.
 @immutable
 class RepairMission {
-  const RepairMission({
+  RepairMission({
+    required this.id,
+    List<String> conceptIds = const [],
+    List<String> reviewedConceptIds = const [],
+    required this.createdAt,
+    this.completedAt,
+    this.catastropheEventId,
+  })  : conceptIds = IList(conceptIds),
+        reviewedConceptIds = IList(reviewedConceptIds);
+
+  const RepairMission._raw({
     required this.id,
     required this.conceptIds,
-    this.reviewedConceptIds = const [],
+    required this.reviewedConceptIds,
     required this.createdAt,
     this.completedAt,
     this.catastropheEventId,
   });
 
   factory RepairMission.fromJson(Map<String, dynamic> json) {
-    return RepairMission(
+    return RepairMission._raw(
       id: json['id'] as String,
-      conceptIds:
-          (json['conceptIds'] as List<dynamic>?)?.cast<String>() ?? const [],
-      reviewedConceptIds:
-          (json['reviewedConceptIds'] as List<dynamic>?)?.cast<String>() ??
-              const [],
+      conceptIds: (json['conceptIds'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toIList() ??
+          const IListConst([]),
+      reviewedConceptIds: (json['reviewedConceptIds'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toIList() ??
+          const IListConst([]),
       createdAt: json['createdAt'] as String,
       completedAt: json['completedAt'] as String?,
       catastropheEventId: json['catastropheEventId'] as String?,
@@ -32,10 +46,10 @@ class RepairMission {
   final String id;
 
   /// Concept IDs that need to be reviewed to complete the mission.
-  final List<String> conceptIds;
+  final IList<String> conceptIds;
 
   /// Concept IDs that have been reviewed so far.
-  final List<String> reviewedConceptIds;
+  final IList<String> reviewedConceptIds;
 
   final String createdAt;
   final String? completedAt;
@@ -55,8 +69,8 @@ class RepairMission {
   RepairMission withReviewedConcept(String conceptId, {required DateTime now}) {
     if (reviewedConceptIds.contains(conceptId)) return this;
     if (!conceptIds.contains(conceptId)) return this;
-    final updated = [...reviewedConceptIds, conceptId];
-    return RepairMission(
+    final updated = reviewedConceptIds.add(conceptId);
+    return RepairMission._raw(
       id: id,
       conceptIds: conceptIds,
       reviewedConceptIds: updated,
@@ -71,8 +85,8 @@ class RepairMission {
 
   Map<String, dynamic> toJson() => {
         'id': id,
-        'conceptIds': conceptIds,
-        'reviewedConceptIds': reviewedConceptIds,
+        'conceptIds': conceptIds.toList(),
+        'reviewedConceptIds': reviewedConceptIds.toList(),
         'createdAt': createdAt,
         'completedAt': completedAt,
         'catastropheEventId': catastropheEventId,

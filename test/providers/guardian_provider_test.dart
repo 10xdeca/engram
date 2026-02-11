@@ -12,7 +12,7 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           knowledgeGraphProvider
-              .overrideWith(() => _PreloadedGraphNotifier(const KnowledgeGraph())),
+              .overrideWith(() => _PreloadedGraphNotifier(KnowledgeGraph())),
           teamRepositoryProvider.overrideWithValue(null),
         ],
       );
@@ -24,7 +24,7 @@ void main() {
     });
 
     test('myGuardedClusters filters by currentUid', () {
-      const state = GuardianState(
+      final state = GuardianState(
         clusters: [
           ConceptCluster(label: 'CI/CD', conceptIds: ['a', 'b'], guardianUid: 'me'),
           ConceptCluster(label: 'Docker', conceptIds: ['c'], guardianUid: 'other'),
@@ -39,7 +39,7 @@ void main() {
     });
 
     test('guardianForCluster looks up guardian UID by label', () {
-      const state = GuardianState(
+      final state = GuardianState(
         clusters: [
           ConceptCluster(label: 'CI/CD', conceptIds: ['a'], guardianUid: 'user1'),
           ConceptCluster(label: 'K8s', conceptIds: ['b']),
@@ -53,7 +53,7 @@ void main() {
     });
 
     test('copyWith preserves unspecified fields', () {
-      const state = GuardianState(
+      final state = GuardianState(
         clusters: [
           ConceptCluster(label: 'A', conceptIds: ['a']),
         ],
@@ -66,7 +66,7 @@ void main() {
     });
 
     test('myGuardedClusters returns empty when no uid', () {
-      const state = GuardianState(
+      final state = GuardianState(
         clusters: [
           ConceptCluster(label: 'A', conceptIds: ['a'], guardianUid: 'someone'),
         ],

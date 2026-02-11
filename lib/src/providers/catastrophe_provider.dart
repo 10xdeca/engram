@@ -1,20 +1,29 @@
+import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:meta/meta.dart';
 
-import '../engine/cluster_detector.dart';
 import '../models/catastrophe_event.dart';
 import '../models/network_health.dart';
 import '../models/repair_mission.dart';
+import 'cluster_provider.dart';
 import 'knowledge_graph_provider.dart';
 import 'network_health_provider.dart';
 
 /// Immutable snapshot of catastrophe system state.
 @immutable
 class CatastropheState {
-  const CatastropheState({
+  CatastropheState({
     this.previousTier = HealthTier.healthy,
-    this.activeEvents = const [],
-    this.activeMissions = const [],
+    List<CatastropheEvent> activeEvents = const [],
+    List<RepairMission> activeMissions = const [],
+    this.latestTransition,
+  })  : activeEvents = IList(activeEvents),
+        activeMissions = IList(activeMissions);
+
+  const CatastropheState._raw({
+    required this.previousTier,
+    required this.activeEvents,
+    required this.activeMissions,
     this.latestTransition,
   });
 
@@ -22,10 +31,10 @@ class CatastropheState {
   final HealthTier previousTier;
 
   /// Unresolved catastrophe events.
-  final List<CatastropheEvent> activeEvents;
+  final IList<CatastropheEvent> activeEvents;
 
   /// Uncompleted repair missions.
-  final List<RepairMission> activeMissions;
+  final IList<RepairMission> activeMissions;
 
   /// The most recent tier transition (for UI animation triggers).
   /// Null when no transition has occurred yet.
@@ -33,11 +42,11 @@ class CatastropheState {
 
   CatastropheState copyWith({
     HealthTier? previousTier,
-    List<CatastropheEvent>? activeEvents,
-    List<RepairMission>? activeMissions,
+    IList<CatastropheEvent>? activeEvents,
+    IList<RepairMission>? activeMissions,
     TierTransition? latestTransition,
   }) {
-    return CatastropheState(
+    return CatastropheState._raw(
       previousTier: previousTier ?? this.previousTier,
       activeEvents: activeEvents ?? this.activeEvents,
       activeMissions: activeMissions ?? this.activeMissions,
@@ -135,7 +144,7 @@ class CatastropheNotifier extends Notifier<CatastropheState> {
       clusterLabel: worstCluster,
     );
 
-    final updatedEvents = [...state.activeEvents, event];
+    final updatedEvents = state.activeEvents.add(event);
 
     // Auto-generate repair mission on fracture or collapse
     var updatedMissions = state.activeMissions;
@@ -149,7 +158,7 @@ class CatastropheNotifier extends Notifier<CatastropheState> {
           createdAt: nowStr,
           catastropheEventId: event.id,
         );
-        updatedMissions = [...updatedMissions, mission];
+        updatedMissions = updatedMissions.add(mission);
       }
     }
 
@@ -170,10 +179,10 @@ class CatastropheNotifier extends Notifier<CatastropheState> {
         );
       }
       return event;
-    }).toList();
+    });
 
     // Keep only unresolved events in the active list
-    final stillActive = resolvedEvents.where((e) => !e.isResolved).toList();
+    final stillActive = resolvedEvents.where((e) => !e.isResolved).toIList();
 
     state = state.copyWith(
       previousTier: transition.to,
@@ -189,10 +198,10 @@ class CatastropheNotifier extends Notifier<CatastropheState> {
       if (mission.isComplete) return mission;
       if (!mission.conceptIds.contains(conceptId)) return mission;
       return mission.withReviewedConcept(conceptId, now: now);
-    }).toList();
+    });
 
     // Remove completed missions from active list
-    final stillActive = updatedMissions.where((m) => !m.isComplete).toList();
+    final stillActive = updatedMissions.where((m) => !m.isComplete).toIList();
 
     state = state.copyWith(activeMissions: stillActive);
   }
@@ -203,7 +212,7 @@ class CatastropheNotifier extends Notifier<CatastropheState> {
     final graph = ref.read(knowledgeGraphProvider).valueOrNull;
     if (graph == null) return [];
 
-    final clusters = ClusterDetector(graph).detect();
+    final clusters = ref.read(clusterProvider);
     final health = ref.read(networkHealthProvider);
 
     // Find concepts in the weakest clusters
@@ -228,7 +237,7 @@ class CatastropheNotifier extends Notifier<CatastropheState> {
     final graph = ref.read(knowledgeGraphProvider).valueOrNull;
     if (graph == null) return [];
 
-    final clusters = ClusterDetector(graph).detect();
+    final clusters = ref.read(clusterProvider);
     final health = ref.read(networkHealthProvider);
 
     // Target the weakest cluster's concepts
@@ -243,6 +252,6 @@ class CatastropheNotifier extends Notifier<CatastropheState> {
     final targetCluster =
         clusters.where((c) => c.label == weakest.key).firstOrNull;
 
-    return targetCluster?.conceptIds ?? [];
+    return targetCluster?.conceptIds.toList() ?? [];
   }
 }

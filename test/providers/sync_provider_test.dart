@@ -78,9 +78,9 @@ void main() {
     });
 
     test('checkForUpdates finds stale documents', () async {
-      const graph = KnowledgeGraph(
+      final graph = KnowledgeGraph(
         documentMetadata: [
-          DocumentMetadata(
+          const DocumentMetadata(
             documentId: 'doc1',
             title: 'Docker Guide',
             updatedAt: '2025-01-01T00:00:00.000Z',
@@ -125,9 +125,9 @@ void main() {
     });
 
     test('checkForUpdates reports up-to-date when no changes', () async {
-      const graph = KnowledgeGraph(
+      final graph = KnowledgeGraph(
         documentMetadata: [
-          DocumentMetadata(
+          const DocumentMetadata(
             documentId: 'doc1',
             title: 'Docker Guide',
             updatedAt: '2025-01-01T00:00:00.000Z',
@@ -171,9 +171,9 @@ void main() {
 
     test('checkForUpdates detects new documents in existing collection', () async {
       // Graph has doc1, but Outline returns doc1 + doc2 (new)
-      const graph = KnowledgeGraph(
+      final graph = KnowledgeGraph(
         documentMetadata: [
-          DocumentMetadata(
+          const DocumentMetadata(
             documentId: 'doc1',
             title: 'Docker Guide',
             updatedAt: '2025-01-01T00:00:00.000Z',
@@ -231,9 +231,9 @@ void main() {
       prefs = await SharedPreferences.getInstance();
       settingsRepo = SettingsRepository(prefs);
 
-      const graph = KnowledgeGraph(
+      final graph = KnowledgeGraph(
         documentMetadata: [
-          DocumentMetadata(
+          const DocumentMetadata(
             documentId: 'doc1',
             title: 'Docker Guide',
             updatedAt: '2025-01-01T00:00:00.000Z',
@@ -259,9 +259,9 @@ void main() {
 
     test('checkForUpdates discovers new collections in Outline', () async {
       // col1 is ingested, but Outline now has col1 + col2
-      const graph = KnowledgeGraph(
+      final graph = KnowledgeGraph(
         documentMetadata: [
-          DocumentMetadata(
+          const DocumentMetadata(
             documentId: 'doc1',
             title: 'Docker Guide',
             updatedAt: '2025-01-01T00:00:00.000Z',
@@ -310,9 +310,9 @@ void main() {
     });
 
     test('dismissNewCollections clears banner and returns to upToDate', () async {
-      const graph = KnowledgeGraph(
+      final graph = KnowledgeGraph(
         documentMetadata: [
-          DocumentMetadata(
+          const DocumentMetadata(
             documentId: 'doc1',
             title: 'Docker Guide',
             updatedAt: '2025-01-01T00:00:00.000Z',
@@ -365,9 +365,9 @@ void main() {
     });
 
     test('checkForUpdates handles API errors gracefully', () async {
-      const graph = KnowledgeGraph(
+      final graph = KnowledgeGraph(
         documentMetadata: [
-          DocumentMetadata(
+          const DocumentMetadata(
             documentId: 'doc1',
             title: 'Docker Guide',
             updatedAt: '2025-01-01T00:00:00.000Z',

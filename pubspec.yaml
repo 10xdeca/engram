@@ -24,6 +24,8 @@ dependencies:
   google_sign_in: ^6.2.1
   sign_in_with_apple: ^6.1.0
   crypto: ^3.0.3
+  fast_immutable_collections: ^11.0.0
+  graphs: ^2.3.2
 
 dev_dependencies:
   flutter_test:

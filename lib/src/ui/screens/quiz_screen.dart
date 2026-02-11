@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../models/quiz_item.dart';
 import '../../models/quiz_session_state.dart';
 import '../../models/session_mode.dart';
 import '../../providers/knowledge_graph_provider.dart';
 import '../../providers/quiz_session_provider.dart';
+import '../../providers/split_concept_provider.dart';
 import '../widgets/quality_rating_bar.dart';
 import '../widgets/quiz_card.dart';
 import '../widgets/session_summary.dart';
+import '../widgets/split_concept_sheet.dart';
 
 class QuizScreen extends ConsumerWidget {
   const QuizScreen({super.key});
@@ -15,13 +18,16 @@ class QuizScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(quizSessionProvider);
-    final graphAsync = ref.watch(knowledgeGraphProvider);
+    final hasItems = ref.watch(
+      knowledgeGraphProvider.select(
+          (av) => av.valueOrNull?.quizItems.isNotEmpty ?? false),
+    );
 
     return Scaffold(
       appBar: AppBar(title: const Text('Quiz')),
       body: switch (session.phase) {
         QuizPhase.idle => _IdleView(
-            hasItems: graphAsync.valueOrNull?.quizItems.isNotEmpty ?? false,
+            hasItems: hasItems,
             isComeback: session.isComeback,
             daysSinceLastSession: session.daysSinceLastSession,
             onStart: (mode) =>
@@ -186,8 +192,40 @@ class _RevealedView extends ConsumerWidget {
             onRate: (quality) =>
                 ref.read(quizSessionProvider.notifier).rateItem(quality),
           ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: () => _showSplitSheet(context, ref, item),
+            icon: const Icon(Icons.call_split, size: 18),
+            label: const Text('Split this concept'),
+          ),
         ],
       ),
+    );
+  }
+
+  void _showSplitSheet(BuildContext context, WidgetRef ref, QuizItem item) {
+    // Look up the concept for this quiz item
+    final graph = ref.read(knowledgeGraphProvider).valueOrNull;
+    if (graph == null) return;
+
+    final concept = graph.concepts
+        .where((c) => c.id == item.conceptId)
+        .firstOrNull;
+    if (concept == null) return;
+
+    ref.read(splitConceptProvider.notifier).requestSplit(
+      conceptId: concept.id,
+      conceptName: concept.name,
+      conceptDescription: concept.description,
+      sourceDocumentId: concept.sourceDocumentId,
+      quizQuestion: item.question,
+      quizAnswer: item.answer,
+    );
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => const SplitConceptSheet(),
     );
   }
 }

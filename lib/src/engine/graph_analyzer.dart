@@ -1,3 +1,6 @@
+import 'package:graphs/graphs.dart' as graphs;
+
+import '../models/concept.dart';
 import '../models/knowledge_graph.dart';
 import '../models/relationship.dart';
 
@@ -28,6 +31,14 @@ class GraphAnalyzer {
   late final Map<String, List<int>> _conceptRepetitions =
       _buildConceptRepetitions();
 
+  /// Parent → children adjacency map for sub-concept relationships.
+  late final Map<String, Set<String>> _children = _buildChildren();
+
+  /// Concept ID → Concept lookup.
+  late final Map<String, Concept> _conceptMap = {
+    for (final c in _graph.concepts) c.id: c,
+  };
+
   /// Whether [relationship] represents a dependency (prerequisite) edge.
   static bool isDependencyEdge(Relationship relationship) {
     final lower = relationship.label.toLowerCase();
@@ -42,16 +53,41 @@ class GraphAnalyzer {
   Set<String> dependentsOf(String conceptId) =>
       _dependents[conceptId] ?? const {};
 
+  /// The child concept IDs of a parent concept.
+  Set<String> childrenOf(String conceptId) =>
+      _children[conceptId] ?? const {};
+
+  /// Whether this concept has been split into sub-concepts.
+  bool hasChildren(String conceptId) =>
+      _children.containsKey(conceptId) && _children[conceptId]!.isNotEmpty;
+
   /// A concept is mastered when all its quiz items have repetitions >= 1.
   /// Concepts with no quiz items are considered mastered (informational nodes).
-  bool isConceptMastered(String conceptId) {
+  ///
+  /// If the concept has children (was split), it's mastered only when ALL
+  /// children are mastered.
+  bool isConceptMastered(String conceptId, {Set<String>? visited}) {
+    final seen = visited ?? <String>{};
+    if (!seen.add(conceptId)) return true; // cycle guard
+
+    if (hasChildren(conceptId)) {
+      return childrenOf(conceptId).every(
+        (childId) => isConceptMastered(childId, visited: seen),
+      );
+    }
+
     final reps = _conceptRepetitions[conceptId];
     if (reps == null || reps.isEmpty) return true;
     return reps.every((r) => r >= 1);
   }
 
   /// A concept is unlocked when all its prerequisites are mastered.
+  /// Children inherit their parent's unlock status.
   bool isConceptUnlocked(String conceptId) {
+    final concept = _conceptMap[conceptId];
+    if (concept != null && concept.parentConceptId != null) {
+      return isConceptUnlocked(concept.parentConceptId!);
+    }
     return prerequisitesOf(conceptId).every(isConceptMastered);
   }
 
@@ -77,36 +113,14 @@ class GraphAnalyzer {
   /// edges, or `null` if the graph contains cycles.
   List<String>? topologicalSort() {
     final conceptIds = {for (final c in _graph.concepts) c.id};
-    final inDegree = <String, int>{for (final id in conceptIds) id: 0};
-
-    for (final id in conceptIds) {
-      for (final prereq in prerequisitesOf(id)) {
-        if (conceptIds.contains(prereq)) {
-          inDegree[id] = (inDegree[id] ?? 0) + 1;
-        }
-      }
+    try {
+      return graphs.topologicalSort<String>(
+        conceptIds,
+        (id) => dependentsOf(id).where(conceptIds.contains),
+      );
+    } on graphs.CycleException {
+      return null;
     }
-
-    final queue = <String>[
-      for (final id in conceptIds)
-        if (inDegree[id] == 0) id,
-    ];
-    final sorted = <String>[];
-
-    while (queue.isNotEmpty) {
-      final current = queue.removeAt(0);
-      sorted.add(current);
-
-      for (final dep in dependentsOf(current)) {
-        if (!conceptIds.contains(dep)) continue;
-        inDegree[dep] = (inDegree[dep] ?? 1) - 1;
-        if (inDegree[dep] == 0) {
-          queue.add(dep);
-        }
-      }
-    }
-
-    return sorted.length == conceptIds.length ? sorted : null;
   }
 
   /// Whether the dependency graph contains cycles.
@@ -137,6 +151,16 @@ class GraphAnalyzer {
     final map = <String, List<int>>{};
     for (final q in _graph.quizItems) {
       map.putIfAbsent(q.conceptId, () => []).add(q.repetitions);
+    }
+    return map;
+  }
+
+  Map<String, Set<String>> _buildChildren() {
+    final map = <String, Set<String>>{};
+    for (final c in _graph.concepts) {
+      if (c.parentConceptId != null) {
+        map.putIfAbsent(c.parentConceptId!, () => {}).add(c.id);
+      }
     }
     return map;
   }

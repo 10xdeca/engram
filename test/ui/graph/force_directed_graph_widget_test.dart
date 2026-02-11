@@ -10,12 +10,12 @@ void main() {
   group('ForceDirectedGraphWidget', () {
     testWidgets('renders and settles with pumpAndSettle', (tester) async {
       final graph = KnowledgeGraph(
-        concepts: const [
+        concepts: [
           Concept(id: 'c1', name: 'Docker', description: 'Containers', sourceDocumentId: 'doc1'),
           Concept(id: 'c2', name: 'K8s', description: 'Orchestration', sourceDocumentId: 'doc1'),
         ],
-        relationships: const [
-          Relationship(id: 'r1', fromConceptId: 'c2', toConceptId: 'c1', label: 'depends on'),
+        relationships: [
+          const Relationship(id: 'r1', fromConceptId: 'c2', toConceptId: 'c1', label: 'depends on'),
         ],
         quizItems: [
           QuizItem.newCard(id: 'q1', conceptId: 'c1', question: 'Q?', answer: 'A.'),
@@ -36,7 +36,7 @@ void main() {
 
     testWidgets('shows node panel on tap', (tester) async {
       final graph = KnowledgeGraph(
-        concepts: const [
+        concepts: [
           Concept(id: 'c1', name: 'Docker', description: 'Container runtime', sourceDocumentId: 'doc1'),
         ],
         quizItems: [
@@ -60,7 +60,7 @@ void main() {
 
     testWidgets('handles empty graph', (tester) async {
       await tester.pumpWidget(
-        const MaterialApp(
+        MaterialApp(
           home: Scaffold(
             body: ForceDirectedGraphWidget(graph: KnowledgeGraph.empty),
           ),

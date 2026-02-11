@@ -7,6 +7,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/catastrophe_provider.dart';
 import '../../providers/dashboard_stats_provider.dart';
 import '../../providers/guardian_provider.dart';
+import '../../providers/graph_structure_provider.dart';
 import '../../providers/knowledge_graph_provider.dart';
 import '../../providers/network_health_provider.dart';
 import '../../providers/sync_provider.dart';
@@ -23,7 +24,13 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final graphAsync = ref.watch(knowledgeGraphProvider);
+    final isLoading = ref.watch(
+      knowledgeGraphProvider.select((av) => av.isLoading),
+    );
+    final error = ref.watch(
+      knowledgeGraphProvider.select((av) => av.error),
+    );
+    final structure = ref.watch(graphStructureProvider);
     final syncStatus = ref.watch(syncProvider);
 
     return Scaffold(
@@ -43,17 +50,13 @@ class DashboardScreen extends ConsumerWidget {
               collections: syncStatus.newCollections,
             ),
           Expanded(
-            child: graphAsync.when(
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
-              error: (error, _) => Center(child: Text('Error: $error')),
-              data: (graph) {
-                if (graph.concepts.isEmpty) {
-                  return const _EmptyState();
-                }
-                return _DashboardContent();
-              },
-            ),
+            child: isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : error != null
+                    ? Center(child: Text('Error: $error'))
+                    : structure == null
+                        ? const _EmptyState()
+                        : _DashboardContent(),
           ),
         ],
       ),
@@ -252,7 +255,7 @@ class _DashboardContentState extends ConsumerState<_DashboardContent> {
           ),
         ),
         // Team mode toggle + mind map
-        if (graph != null && graph.concepts.isNotEmpty) ...[
+        if (graph != null) ...[
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
