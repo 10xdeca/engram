@@ -245,7 +245,7 @@ class _ForceDirectedGraphWidgetState extends State<ForceDirectedGraphWidget>
     final totalCount = _nodes.length + teamNodes.length;
     final initialPositions = List<Offset?>.generate(totalCount, (i) {
       if (i < _nodes.length) return oldPositions[_nodes[i].id];
-      return null; // team nodes get fresh random positions
+      return null; // team nodes get fresh positions — see #61
     });
     final hasOldPositions = initialPositions.any((p) => p != null);
 

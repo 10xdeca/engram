@@ -118,6 +118,11 @@ class ForceDirectedLayout {
     _temperature = 0.0;
   }
 
+  /// Build initial positions, using [initial] where non-null and filling the
+  /// rest with random offsets. Note: pre-seeded entries skip RNG calls, so the
+  /// random sequence for later nodes diverges from a cold-start layout. This is
+  /// intentional — strict seed-determinism only matters for the null case
+  /// (first build / tests).
   List<Offset> _initPositions(int? seed, List<Offset?>? initial) {
     final rng = math.Random(seed);
     const margin = 30.0;
