@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../engine/scheduler.dart';
 import '../../models/dashboard_stats.dart';
 import '../../models/sync_status.dart';
 import '../../providers/catastrophe_provider.dart';
@@ -193,7 +194,14 @@ class _DashboardContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final graph = ref.watch(filteredGraphProvider);
-    final stats = ref.watch(dashboardStatsProvider);
+
+    // Compute stats from the filtered graph so they reflect the selected
+    // collection, not the global graph.
+    final conceptCount = graph?.concepts.length ?? 0;
+    final masteredCount =
+        graph?.quizItems.where((q) => q.interval >= 21).length ?? 0;
+    final dueCount =
+        graph != null ? scheduleDueItems(graph, maxItems: null).length : 0;
 
     return Stack(
       children: [
@@ -215,7 +223,11 @@ class _DashboardContent extends ConsumerWidget {
           bottom: 0,
           left: 0,
           right: 0,
-          child: _CompactStatsBar(stats: stats),
+          child: _CompactStatsBar(
+            conceptCount: conceptCount,
+            masteredCount: masteredCount,
+            dueCount: dueCount,
+          ),
         ),
       ],
     );
@@ -265,10 +277,19 @@ class _CollectionChipBar extends ConsumerWidget {
 }
 
 /// Semi-transparent stats bar at the bottom of the dashboard.
+///
+/// Shows filtered stats (matching the selected collection). The info button
+/// opens a bottom sheet with full global stats from [dashboardStatsProvider].
 class _CompactStatsBar extends StatelessWidget {
-  const _CompactStatsBar({required this.stats});
+  const _CompactStatsBar({
+    required this.conceptCount,
+    required this.masteredCount,
+    required this.dueCount,
+  });
 
-  final DashboardStats stats;
+  final int conceptCount;
+  final int masteredCount;
+  final int dueCount;
 
   @override
   Widget build(BuildContext context) {
@@ -279,11 +300,11 @@ class _CompactStatsBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
-          _statChip(Icons.lightbulb, '${stats.conceptCount}'),
+          _statChip(Icons.lightbulb, '$conceptCount'),
           const SizedBox(width: 16),
-          _statChip(Icons.check_circle, '${stats.masteredCount}'),
+          _statChip(Icons.check_circle, '$masteredCount'),
           const SizedBox(width: 16),
-          _statChip(Icons.schedule, '${stats.dueCount}'),
+          _statChip(Icons.schedule, '$dueCount'),
           const Spacer(),
           IconButton(
             icon: const Icon(Icons.info_outline, size: 20),
@@ -309,19 +330,18 @@ class _CompactStatsBar extends StatelessWidget {
   void _showStatsSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      builder: (_) => _StatsBottomSheet(stats: stats),
+      builder: (_) => const _StatsBottomSheet(),
     );
   }
 }
 
 /// Bottom sheet with the full stats, mastery bar, health, and graph status.
 class _StatsBottomSheet extends ConsumerWidget {
-  const _StatsBottomSheet({required this.stats});
-
-  final DashboardStats stats;
+  const _StatsBottomSheet();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final stats = ref.watch(dashboardStatsProvider);
     final health = ref.watch(networkHealthProvider);
     final catastrophe = ref.watch(catastropheProvider);
 
