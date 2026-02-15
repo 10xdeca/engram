@@ -92,7 +92,8 @@ class _StaticGraphWidgetState extends State<StaticGraphWidget> {
       layoutEdges.add((srcIdx, tgtIdx));
     }
 
-    // Run layout to convergence
+    // Run layout to convergence synchronously. Fine for current graph sizes
+    // (10-40 concepts). For 200+ nodes, move to compute() Isolate — see #55.
     final layout = ForceDirectedLayout(
       nodeCount: nodes.length,
       edges: layoutEdges,
