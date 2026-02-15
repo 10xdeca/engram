@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../engine/scheduler.dart';
 import '../models/knowledge_graph.dart';
 import 'collection_filter_provider.dart';
 import 'knowledge_graph_provider.dart';
@@ -52,5 +53,19 @@ final filteredGraphProvider = Provider<KnowledgeGraph?>((ref) {
     relationships: relationships,
     quizItems: quizItems,
     documentMetadata: metadata,
+  );
+});
+
+/// Compact stats derived from the filtered graph for the dashboard overlay.
+///
+/// Cached by Riverpod — only recomputes when [filteredGraphProvider] changes.
+final filteredStatsProvider = Provider<({int concepts, int mastered, int due})>((ref) {
+  final graph = ref.watch(filteredGraphProvider);
+  if (graph == null) return (concepts: 0, mastered: 0, due: 0);
+
+  return (
+    concepts: graph.concepts.length,
+    mastered: graph.quizItems.where((q) => q.interval >= 21).length,
+    due: scheduleDueItems(graph, maxItems: null).length,
   );
 });

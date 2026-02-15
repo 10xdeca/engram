@@ -129,6 +129,31 @@ void main() {
       expect(filtered, isNull);
     });
   });
+
+  group('filteredStatsProvider', () {
+    test('returns zero stats when graph is null', () {
+      final container = ProviderContainer(
+        overrides: [
+          knowledgeGraphProvider.overrideWith(() => _PreloadedGraphNotifier(null)),
+        ],
+      );
+
+      final stats = container.read(filteredStatsProvider);
+      expect(stats.concepts, 0);
+      expect(stats.mastered, 0);
+      expect(stats.due, 0);
+    });
+
+    test('computes stats from filtered graph', () async {
+      final graph = _twoCollectionGraph();
+      final container = buildContainer(graph, collectionId: 'colA');
+      await container.read(knowledgeGraphProvider.future);
+
+      final stats = container.read(filteredStatsProvider);
+      expect(stats.concepts, 2); // Docker, K8s
+      expect(stats.due, greaterThanOrEqualTo(0));
+    });
+  });
 }
 
 class _PreloadedGraphNotifier extends KnowledgeGraphNotifier {

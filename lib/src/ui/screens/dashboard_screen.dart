@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../engine/scheduler.dart';
 import '../../models/dashboard_stats.dart';
 import '../../models/sync_status.dart';
 import '../../providers/catastrophe_provider.dart';
@@ -194,14 +193,7 @@ class _DashboardContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final graph = ref.watch(filteredGraphProvider);
-
-    // Compute stats from the filtered graph so they reflect the selected
-    // collection, not the global graph.
-    final conceptCount = graph?.concepts.length ?? 0;
-    final masteredCount =
-        graph?.quizItems.where((q) => q.interval >= 21).length ?? 0;
-    final dueCount =
-        graph != null ? scheduleDueItems(graph, maxItems: null).length : 0;
+    final stats = ref.watch(filteredStatsProvider);
 
     return Stack(
       children: [
@@ -224,9 +216,9 @@ class _DashboardContent extends ConsumerWidget {
           left: 0,
           right: 0,
           child: _CompactStatsBar(
-            conceptCount: conceptCount,
-            masteredCount: masteredCount,
-            dueCount: dueCount,
+            conceptCount: stats.concepts,
+            masteredCount: stats.mastered,
+            dueCount: stats.due,
           ),
         ),
       ],

@@ -156,11 +156,12 @@ class _StaticGraphWidgetState extends State<StaticGraphWidget> {
 
   void _showNodeOverlay(GraphNode node, Offset globalPosition) {
     _removeOverlay();
+    final clamped = _clampOverlayPosition(globalPosition);
 
     _overlayEntry = OverlayEntry(
       builder: (_) => Positioned(
-        left: globalPosition.dx + 12,
-        top: globalPosition.dy - 20,
+        left: clamped.dx,
+        top: clamped.dy,
         child: Material(
           elevation: 0,
           color: Colors.transparent,
@@ -173,11 +174,12 @@ class _StaticGraphWidgetState extends State<StaticGraphWidget> {
 
   void _showEdgeOverlay(GraphEdge edge, Offset globalPosition) {
     _removeOverlay();
+    final clamped = _clampOverlayPosition(globalPosition);
 
     _overlayEntry = OverlayEntry(
       builder: (_) => Positioned(
-        left: globalPosition.dx + 12,
-        top: globalPosition.dy - 20,
+        left: clamped.dx,
+        top: clamped.dy,
         child: Material(
           elevation: 0,
           color: Colors.transparent,
@@ -186,6 +188,26 @@ class _StaticGraphWidgetState extends State<StaticGraphWidget> {
       ),
     );
     Overlay.of(context).insert(_overlayEntry!);
+  }
+
+  /// Clamp overlay position so the 250px panel stays on-screen.
+  Offset _clampOverlayPosition(Offset globalPosition) {
+    const panelWidth = 250.0;
+    const panelHeight = 120.0; // approximate max height
+    const margin = 12.0;
+    final screen = MediaQuery.of(context).size;
+
+    final left = (globalPosition.dx + margin + panelWidth > screen.width)
+        ? globalPosition.dx - panelWidth - margin
+        : globalPosition.dx + margin;
+    final top = (globalPosition.dy - margin / 2 + panelHeight > screen.height)
+        ? globalPosition.dy - panelHeight
+        : globalPosition.dy - margin / 2;
+
+    return Offset(
+      left.clamp(0.0, screen.width - panelWidth),
+      top.clamp(0.0, screen.height - panelHeight),
+    );
   }
 
   void _removeOverlay() {
