@@ -297,9 +297,10 @@ class _IngestAction extends ConsumerWidget {
           ),
         ],
       ),
-      RecommendationIngestStatus.completed => _EvaluationBadge(
-        evaluation: result!.evaluation!,
-      ),
+      RecommendationIngestStatus.completed => switch (result?.evaluation) {
+        final eval? => _EvaluationBadge(evaluation: eval),
+        null => const SizedBox.shrink(),
+      },
       RecommendationIngestStatus.error => Row(
         children: [
           Expanded(

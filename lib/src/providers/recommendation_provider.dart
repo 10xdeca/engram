@@ -4,6 +4,9 @@ import 'package:meta/meta.dart';
 import '../engine/recommendation_evaluation.dart';
 import '../models/knowledge_gap.dart';
 import '../models/recommendation.dart';
+import '../services/extraction_service.dart';
+import '../services/outline_client.dart';
+import 'clock_provider.dart';
 import 'difficulty_evaluation_provider.dart';
 import 'gap_analysis_provider.dart';
 import 'knowledge_graph_provider.dart';
@@ -184,6 +187,14 @@ class RecommendationNotifier extends Notifier<RecommendationState> {
   Future<void> ingestRecommendation(Recommendation recommendation) async {
     final docId = recommendation.documentId;
 
+    // Guard against double-tap: skip if already in progress.
+    final existing = state.ingestResults[docId];
+    if (existing != null &&
+        existing.status != RecommendationIngestStatus.idle &&
+        existing.status != RecommendationIngestStatus.error) {
+      return;
+    }
+
     void updateIngest(RecommendationIngestResult result) {
       state = state.copyWith(
         ingestResults: {...state.ingestResults, docId: result},
@@ -225,7 +236,7 @@ class RecommendationNotifier extends Notifier<RecommendationState> {
         extraction,
         documentId: docId,
         documentTitle: title,
-        updatedAt: DateTime.now().toIso8601String(),
+        updatedAt: ref.read(clockProvider)().toIso8601String(),
         collectionId: recommendation.collectionId,
         collectionName: recommendation.collectionName,
         documentText: content,
@@ -251,6 +262,20 @@ class RecommendationNotifier extends Notifier<RecommendationState> {
         RecommendationIngestResult(
           status: RecommendationIngestStatus.completed,
           evaluation: evaluation,
+        ),
+      );
+    } on OutlineApiException catch (e) {
+      updateIngest(
+        RecommendationIngestResult(
+          status: RecommendationIngestStatus.error,
+          errorMessage: 'Failed to fetch document: ${e.message}',
+        ),
+      );
+    } on ExtractionException catch (e) {
+      updateIngest(
+        RecommendationIngestResult(
+          status: RecommendationIngestStatus.error,
+          errorMessage: 'Extraction failed: ${e.message}',
         ),
       );
     } catch (e) {
