@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/dashboard_stats.dart';
 import '../../models/stale_document.dart';
 import '../../models/sync_status.dart';
+import '../../engine/difficulty_evaluation.dart';
 import '../../providers/catastrophe_provider.dart';
 import '../../providers/collection_filter_provider.dart';
 import '../../providers/dashboard_stats_provider.dart';
+import '../../providers/difficulty_evaluation_provider.dart';
 import '../../providers/filtered_graph_provider.dart';
 import '../../providers/graph_structure_provider.dart';
 import '../../providers/knowledge_graph_provider.dart';
@@ -405,6 +407,7 @@ class _StatsBottomSheet extends ConsumerWidget {
     final stats = ref.watch(dashboardStatsProvider);
     final health = ref.watch(networkHealthProvider);
     final catastrophe = ref.watch(catastropheProvider);
+    final evaluation = ref.watch(difficultyEvaluationProvider);
 
     return DraggableScrollableSheet(
       initialChildSize: 0.6,
@@ -466,11 +469,60 @@ class _StatsBottomSheet extends ConsumerWidget {
                 padding: const EdgeInsets.only(top: 8),
                 child: RepairMissionCard(mission: mission),
               ),
+            if (evaluation.evaluatedCount > 0) ...[
+              const SizedBox(height: 16),
+              _PredictionAccuracyCard(evaluation: evaluation),
+            ],
             const SizedBox(height: 16),
             _GraphStatusCard(stats: stats),
           ],
         );
       },
+    );
+  }
+}
+
+/// Card showing how well Claude's difficulty predictions match FSRS actuals.
+class _PredictionAccuracyCard extends StatelessWidget {
+  const _PredictionAccuracyCard({required this.evaluation});
+
+  final DifficultyEvaluationResult evaluation;
+
+  @override
+  Widget build(BuildContext context) {
+    final mae = evaluation.meanAbsoluteError;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Prediction Accuracy',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            _row('Cards evaluated', '${evaluation.evaluatedCount}'),
+            if (mae != null) _row('Mean absolute error', mae.toStringAsFixed(1)),
+            for (final entry in evaluation.bandAccuracy.entries)
+              _row(
+                '${entry.key[0].toUpperCase()}${entry.key.substring(1)} band',
+                '${entry.value.correct}/${entry.value.predicted} correct',
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _row(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [Text(label), Text(value)],
+      ),
     );
   }
 }
