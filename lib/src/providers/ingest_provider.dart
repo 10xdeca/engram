@@ -662,23 +662,26 @@ class IngestNotifier extends Notifier<IngestState> {
     ExtractionService extraction,
     String documentId,
   ) async {
-    final highDifficultyItems =
-        result.quizItems
-            .where(
-              (q) =>
-                  q.predictedDifficulty != null &&
-                  q.predictedDifficulty! > 8.0,
-            )
-            .take(3)
-            .toList();
+    // Deduplicate by parent concept — multiple quiz items may reference
+    // the same concept, but we only need to split each concept once.
+    final seenConceptIds = <String>{};
+    final itemsToSplit = <QuizItem>[];
+    for (final item in result.quizItems) {
+      if (item.predictedDifficulty != null &&
+          item.predictedDifficulty! > 8.0 &&
+          seenConceptIds.add(item.conceptId)) {
+        itemsToSplit.add(item);
+        if (itemsToSplit.length >= 3) break;
+      }
+    }
 
-    if (highDifficultyItems.isEmpty) return result;
+    if (itemsToSplit.isEmpty) return result;
 
     final newConcepts = <Concept>[];
     final newRelationships = <Relationship>[];
     final newQuizItems = <QuizItem>[];
 
-    for (final item in highDifficultyItems) {
+    for (final item in itemsToSplit) {
       final parentConcept = result.concepts
           .where((c) => c.id == item.conceptId)
           .firstOrNull;
@@ -705,14 +708,14 @@ class IngestNotifier extends Notifier<IngestState> {
         for (final entry in suggestion.entries) {
           newConcepts.add(entry.concept);
           newQuizItems.addAll(entry.quizItems);
-          // Add prerequisite relationship from sub-concept to parent
+          // Add composition relationship: sub-concept is part of parent
           newRelationships.add(
             Relationship(
-              id: '${entry.concept.id}-to-${parentConcept.id}',
+              id: const Uuid().v4(),
               fromConceptId: entry.concept.id,
               toConceptId: parentConcept.id,
               label: 'is part of',
-              type: RelationshipType.prerequisite,
+              type: RelationshipType.composition,
             ),
           );
         }

@@ -139,6 +139,29 @@ void main() {
       expect(high.predicted, 1);
     });
 
+    test('skips items with null FSRS difficulty', () {
+      final items = [
+        testQuizItem(
+          id: 'q1',
+          predictedDifficulty: 5.0,
+          difficulty: null,
+          reviewCount: 10,
+        ),
+        testQuizItem(
+          id: 'q2',
+          predictedDifficulty: 5.0,
+          difficulty: 5.0,
+          reviewCount: 10,
+        ),
+      ];
+
+      final result = evaluatePredictions(items);
+
+      // q1 skipped (null difficulty), only q2 evaluated
+      expect(result.evaluatedCount, 1);
+      expect(result.totalPredicted, 2);
+    });
+
     test('respects custom minReviews threshold', () {
       final items = [
         testQuizItem(

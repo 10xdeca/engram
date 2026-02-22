@@ -11,7 +11,7 @@ QuizItem testQuizItem({
   int interval = 0,
   DateTime? nextReview,
   DateTime? lastReview,
-  double difficulty = 5.0,
+  double? difficulty = 5.0,
   double stability = 3.26,
   int fsrsState = 1,
   int lapses = 0,

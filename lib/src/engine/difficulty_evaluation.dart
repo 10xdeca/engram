@@ -38,12 +38,17 @@ DifficultyEvaluationResult evaluatePredictions(
 
   // Compute mean absolute error
   var totalError = 0.0;
+  var evaluatedCount = 0;
   final bandCorrect = <String, int>{'low': 0, 'medium': 0, 'high': 0};
   final bandPredicted = <String, int>{'low': 0, 'medium': 0, 'high': 0};
 
   for (final item in evaluated) {
     final predicted = item.predictedDifficulty!;
-    final actual = item.difficulty ?? 5.0;
+    // After 5+ reviews, FSRS difficulty is always set. Skip items with
+    // null difficulty defensively (shouldn't happen in practice).
+    if (item.difficulty == null) continue;
+    final actual = item.difficulty!;
+    evaluatedCount++;
 
     totalError += (predicted - actual).abs();
 
@@ -53,6 +58,15 @@ DifficultyEvaluationResult evaluatePredictions(
     if (predictedBand == actualBand) {
       bandCorrect[predictedBand] = bandCorrect[predictedBand]! + 1;
     }
+  }
+
+  if (evaluatedCount == 0) {
+    return DifficultyEvaluationResult(
+      evaluatedCount: 0,
+      totalPredicted: totalPredicted,
+      meanAbsoluteError: null,
+      bandAccuracy: const {},
+    );
   }
 
   final bandAccuracy = <String, BandAccuracy>{};
@@ -67,9 +81,9 @@ DifficultyEvaluationResult evaluatePredictions(
   }
 
   return DifficultyEvaluationResult(
-    evaluatedCount: evaluated.length,
+    evaluatedCount: evaluatedCount,
     totalPredicted: totalPredicted,
-    meanAbsoluteError: totalError / evaluated.length,
+    meanAbsoluteError: totalError / evaluatedCount,
     bandAccuracy: bandAccuracy,
   );
 }

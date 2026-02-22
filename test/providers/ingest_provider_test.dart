@@ -4,6 +4,7 @@ import 'package:engram/src/models/concept.dart';
 import 'package:engram/src/models/ingest_state.dart';
 import 'package:engram/src/models/knowledge_graph.dart';
 import 'package:engram/src/models/quiz_item.dart';
+import 'package:engram/src/models/relationship.dart';
 import 'package:engram/src/models/sub_concept_suggestion.dart';
 import 'package:engram/src/providers/ingest_provider.dart';
 import 'package:engram/src/providers/knowledge_graph_provider.dart';
@@ -324,6 +325,11 @@ void main() {
         );
         // Original quiz item + sub-concept quiz item
         expect(graph.quizItems, hasLength(2));
+        // Relationship should be composition (not prerequisite)
+        expect(graph.relationships, hasLength(1));
+        expect(graph.relationships.first.type, RelationshipType.composition);
+        expect(graph.relationships.first.fromConceptId, 'hard-concept-part-a');
+        expect(graph.relationships.first.toConceptId, 'hard-concept');
 
         verify(
           () => mockExtraction.generateSubConcepts(
@@ -520,6 +526,81 @@ void main() {
             sourceDocumentId: any(named: 'sourceDocumentId'),
           ),
         ).called(3);
+      });
+
+      test('deduplicates by parent concept when multiple quiz items share one',
+          () async {
+        when(
+          () => mockExtraction.extract(
+            documentTitle: any(named: 'documentTitle'),
+            documentContent: any(named: 'documentContent'),
+            existingConceptIds: any(named: 'existingConceptIds'),
+            predictionAccuracy: any(named: 'predictionAccuracy'),
+          ),
+        ).thenAnswer(
+          (_) async => ExtractionResult(
+            concepts: [
+              Concept(
+                id: 'hard-concept',
+                name: 'Hard Concept',
+                description: 'Very complex',
+                sourceDocumentId: '',
+              ),
+            ],
+            relationships: const [],
+            quizItems: [
+              // Two quiz items referencing the same concept, both > 8.0
+              QuizItem.newCard(
+                id: 'q1',
+                conceptId: 'hard-concept',
+                question: 'Q1?',
+                answer: 'A1.',
+                predictedDifficulty: 9.0,
+              ),
+              QuizItem.newCard(
+                id: 'q2',
+                conceptId: 'hard-concept',
+                question: 'Q2?',
+                answer: 'A2.',
+                predictedDifficulty: 8.5,
+              ),
+            ],
+          ),
+        );
+
+        when(
+          () => mockExtraction.generateSubConcepts(
+            parentConceptId: any(named: 'parentConceptId'),
+            parentName: any(named: 'parentName'),
+            parentDescription: any(named: 'parentDescription'),
+            quizQuestion: any(named: 'quizQuestion'),
+            quizAnswer: any(named: 'quizAnswer'),
+            sourceDocumentId: any(named: 'sourceDocumentId'),
+          ),
+        ).thenAnswer(
+          (_) async => SubConceptSuggestion(entries: const []),
+        );
+
+        final container = createContainer(httpClient: httpClient);
+        await container.read(knowledgeGraphProvider.future);
+
+        container.read(ingestProvider.notifier).selectCollection({
+          'id': 'col1',
+          'name': 'Engineering',
+        });
+        await container.read(ingestProvider.notifier).startIngestion();
+
+        // Only 1 split attempted — same concept deduped
+        verify(
+          () => mockExtraction.generateSubConcepts(
+            parentConceptId: 'hard-concept',
+            parentName: any(named: 'parentName'),
+            parentDescription: any(named: 'parentDescription'),
+            quizQuestion: any(named: 'quizQuestion'),
+            quizAnswer: any(named: 'quizAnswer'),
+            sourceDocumentId: any(named: 'sourceDocumentId'),
+          ),
+        ).called(1);
       });
     });
   });
