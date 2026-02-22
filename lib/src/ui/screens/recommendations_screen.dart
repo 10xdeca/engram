@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../engine/recommendation_evaluation.dart';
 import '../../models/knowledge_gap.dart';
 import '../../models/recommendation.dart';
 import '../../providers/gap_analysis_provider.dart';
@@ -172,13 +173,19 @@ class _GapChip extends StatelessWidget {
   }
 }
 
-class _RecommendationCard extends StatelessWidget {
+class _RecommendationCard extends ConsumerWidget {
   const _RecommendationCard({required this.recommendation});
 
   final Recommendation recommendation;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ingestResult = ref.watch(
+      recommendationProvider.select(
+        (s) => s.ingestResults[recommendation.documentId],
+      ),
+    );
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -233,9 +240,120 @@ class _RecommendationCard extends StatelessWidget {
                 ),
               ),
             ],
+            const SizedBox(height: 12),
+            _IngestAction(
+              recommendation: recommendation,
+              result: ingestResult,
+            ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Shows the ingest button, loading state, evaluation result, or error.
+class _IngestAction extends ConsumerWidget {
+  const _IngestAction({required this.recommendation, this.result});
+
+  final Recommendation recommendation;
+  final RecommendationIngestResult? result;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = result?.status ?? RecommendationIngestStatus.idle;
+
+    return switch (status) {
+      RecommendationIngestStatus.idle => FilledButton.tonal(
+        onPressed: () {
+          ref
+              .read(recommendationProvider.notifier)
+              .ingestRecommendation(recommendation);
+        },
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.download, size: 18),
+            SizedBox(width: 8),
+            Text('Ingest'),
+          ],
+        ),
+      ),
+      RecommendationIngestStatus.ingesting ||
+      RecommendationIngestStatus.evaluating => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            status == RecommendationIngestStatus.ingesting
+                ? 'Ingesting...'
+                : 'Evaluating...',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+      RecommendationIngestStatus.completed => _EvaluationBadge(
+        evaluation: result!.evaluation!,
+      ),
+      RecommendationIngestStatus.error => Row(
+        children: [
+          Expanded(
+            child: Text(
+              result?.errorMessage ?? 'Unknown error',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.error,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: () {
+              ref
+                  .read(recommendationProvider.notifier)
+                  .ingestRecommendation(recommendation);
+            },
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
+    };
+  }
+}
+
+/// Displays evaluation accuracy after a successful ingest.
+class _EvaluationBadge extends StatelessWidget {
+  const _EvaluationBadge({required this.evaluation});
+
+  final RecommendationEvaluationResult evaluation;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (evaluation.accuracy) {
+      final a? when a >= 0.75 => Colors.green,
+      final a? when a >= 0.5 => Colors.amber,
+      _ => Colors.grey,
+    };
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.check_circle, size: 16, color: color),
+        const SizedBox(width: 6),
+        Text(
+          '${evaluation.matchedCount}/${evaluation.totalPredicted} edges matched',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 }
