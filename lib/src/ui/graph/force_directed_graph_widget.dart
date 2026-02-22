@@ -625,7 +625,7 @@ class _ForceDirectedGraphWidgetState extends State<ForceDirectedGraphWidget>
         transformationController: _transformController,
         constrained: false,
         boundaryMargin: const EdgeInsets.all(double.infinity),
-        minScale: 0.05,
+        minScale: 0.1,
         maxScale: 3.0,
         child: CustomPaint(
           size: graphSize,
