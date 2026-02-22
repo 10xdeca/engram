@@ -183,5 +183,71 @@ void main() {
 
       await client.listCollections();
     });
+
+    test('search returns results with document and context', () async {
+      final mockClient = MockClient((request) async {
+        expect(request.url.path, '/api/documents.search');
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        expect(body['query'], 'neural networks');
+        expect(body['limit'], 5);
+
+        return http.Response(
+          jsonEncode({
+            'data': [
+              {
+                'document': {
+                  'id': 'doc-1',
+                  'title': 'Neural Network Basics',
+                },
+                'context': 'Neural networks are computational models...',
+              },
+              {
+                'document': {
+                  'id': 'doc-2',
+                  'title': 'Deep Learning',
+                },
+                'context': 'Deep learning uses neural network layers...',
+              },
+            ],
+          }),
+          200,
+        );
+      });
+
+      final client = OutlineClient(
+        apiUrl: 'https://wiki.example.com',
+        apiKey: 'test-key',
+        httpClient: mockClient,
+      );
+
+      final results = await client.search('neural networks', limit: 5);
+
+      expect(results, hasLength(2));
+      expect(
+        (results[0]['document'] as Map)['title'],
+        'Neural Network Basics',
+      );
+      expect(results[0]['context'], contains('computational models'));
+    });
+
+    test('search passes collectionId when provided', () async {
+      final mockClient = MockClient((request) async {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        expect(body['collectionId'], 'col-42');
+        return http.Response(jsonEncode({'data': <dynamic>[]}), 200);
+      });
+
+      final client = OutlineClient(
+        apiUrl: 'https://wiki.example.com',
+        apiKey: 'test-key',
+        httpClient: mockClient,
+      );
+
+      final results = await client.search(
+        'test',
+        collectionId: 'col-42',
+      );
+      expect(results, isEmpty);
+    });
   });
 }

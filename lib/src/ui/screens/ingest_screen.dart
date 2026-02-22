@@ -12,6 +12,7 @@ import '../../providers/settings_provider.dart';
 import '../../providers/topic_provider.dart';
 import '../graph/force_directed_graph_widget.dart';
 import '../widgets/document_diff_sheet.dart';
+import 'recommendations_screen.dart';
 
 class IngestScreen extends ConsumerWidget {
   const IngestScreen({super.key});
@@ -22,7 +23,22 @@ class IngestScreen extends ConsumerWidget {
     final ingest = ref.watch(ingestProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Ingest')),
+      appBar: AppBar(
+        title: const Text('Ingest'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.lightbulb_outline),
+            tooltip: 'Curiosity Engine',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const RecommendationsScreen(),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
       body:
           !config.isFullyConfigured
               ? _notConfigured(context)
