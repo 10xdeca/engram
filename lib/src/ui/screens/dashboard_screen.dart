@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/dashboard_stats.dart';
+import '../../models/knowledge_gap.dart';
 import '../../models/stale_document.dart';
 import '../../models/sync_status.dart';
 import '../../engine/difficulty_evaluation.dart';
@@ -10,9 +11,11 @@ import '../../providers/collection_filter_provider.dart';
 import '../../providers/dashboard_stats_provider.dart';
 import '../../providers/difficulty_evaluation_provider.dart';
 import '../../providers/filtered_graph_provider.dart';
+import '../../providers/gap_analysis_provider.dart';
 import '../../providers/graph_structure_provider.dart';
 import '../../providers/knowledge_graph_provider.dart';
 import '../../providers/network_health_provider.dart';
+import '../../providers/recommendation_provider.dart';
 import '../../providers/sync_provider.dart';
 import '../graph/force_directed_graph_widget.dart';
 import '../navigation_shell.dart';
@@ -21,6 +24,7 @@ import '../widgets/mastery_bar.dart';
 import '../widgets/network_health_indicator.dart';
 import '../widgets/repair_mission_card.dart';
 import '../widgets/stat_card.dart';
+import 'recommendations_screen.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -408,6 +412,8 @@ class _StatsBottomSheet extends ConsumerWidget {
     final health = ref.watch(networkHealthProvider);
     final catastrophe = ref.watch(catastropheProvider);
     final evaluation = ref.watch(difficultyEvaluationProvider);
+    final gaps = ref.watch(gapAnalysisProvider);
+    final recState = ref.watch(recommendationProvider);
 
     return DraggableScrollableSheet(
       initialChildSize: 0.6,
@@ -473,6 +479,10 @@ class _StatsBottomSheet extends ConsumerWidget {
               const SizedBox(height: 16),
               _PredictionAccuracyCard(evaluation: evaluation),
             ],
+            if (gaps.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              _CuriosityCard(gaps: gaps, recState: recState),
+            ],
             const SizedBox(height: 16),
             _GraphStatusCard(stats: stats),
           ],
@@ -522,6 +532,86 @@ class _PredictionAccuracyCard extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [Text(label), Text(value)],
+      ),
+    );
+  }
+}
+
+/// Card showing detected knowledge gaps with scan/explore actions.
+class _CuriosityCard extends ConsumerWidget {
+  const _CuriosityCard({required this.gaps, required this.recState});
+
+  final List<KnowledgeGap> gaps;
+  final RecommendationState recState;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final topRec = recState.recommendations.isNotEmpty
+        ? recState.recommendations.first
+        : null;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Curiosity Engine',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${gaps.length} gap${gaps.length == 1 ? '' : 's'} detected '
+              'in your knowledge graph',
+            ),
+            if (topRec != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Top pick: "${topRec.documentTitle}" '
+                '(${(topRec.score * 100).toInt()}% fit)',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                if (recState.phase == RecommendationPhase.idle ||
+                    recState.phase == RecommendationPhase.done ||
+                    recState.phase == RecommendationPhase.error)
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      ref
+                          .read(recommendationProvider.notifier)
+                          .findRecommendations();
+                    },
+                    icon: const Icon(Icons.search, size: 18),
+                    label: const Text('Scan'),
+                  )
+                else
+                  const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const RecommendationsScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.explore, size: 18),
+                  label: const Text('Explore'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

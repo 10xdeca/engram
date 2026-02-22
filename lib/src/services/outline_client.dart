@@ -90,6 +90,26 @@ class OutlineClient {
     return allDocs;
   }
 
+  /// Search for documents by query text.
+  ///
+  /// Returns a list of search result maps, each containing a `document` object
+  /// and a `context` snippet highlighting the match. Optionally scoped to a
+  /// single collection via [collectionId].
+  Future<List<Map<String, dynamic>>> search(
+    String query, {
+    int limit = 10,
+    String? collectionId,
+  }) async {
+    final body = <String, dynamic>{
+      'query': query,
+      'limit': limit,
+      if (collectionId != null) 'collectionId': collectionId,
+    };
+    final result = await _post('/api/documents.search', body);
+    final data = result['data'] as List<dynamic>;
+    return data.cast<Map<String, dynamic>>();
+  }
+
   /// Get a single document by ID.
   Future<Map<String, dynamic>> getDocument(String documentId) async {
     final result = await _post('/api/documents.info', {'id': documentId});
