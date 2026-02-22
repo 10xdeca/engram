@@ -112,6 +112,17 @@ class RecommendationEvaluationResult {
     required this.accuracy,
   });
 
+  factory RecommendationEvaluationResult.fromJson(Map<String, dynamic> json) {
+    return RecommendationEvaluationResult(
+      matchedCount: json['matchedCount'] as int,
+      missedCount: json['missedCount'] as int,
+      unexpectedCount: json['unexpectedCount'] as int,
+      totalPredicted: json['totalPredicted'] as int,
+      totalActualNew: json['totalActualNew'] as int,
+      accuracy: (json['accuracy'] as num?)?.toDouble(),
+    );
+  }
+
   /// Predicted edges that matched actual new edges.
   final int matchedCount;
 
@@ -129,4 +140,13 @@ class RecommendationEvaluationResult {
 
   /// Fraction of predictions that matched (null if no predictions).
   final double? accuracy;
+
+  Map<String, dynamic> toJson() => {
+    'matchedCount': matchedCount,
+    'missedCount': missedCount,
+    'unexpectedCount': unexpectedCount,
+    'totalPredicted': totalPredicted,
+    'totalActualNew': totalActualNew,
+    'accuracy': accuracy,
+  };
 }

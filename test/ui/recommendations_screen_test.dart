@@ -1,3 +1,4 @@
+import 'package:engram/src/engine/recommendation_evaluation.dart';
 import 'package:engram/src/models/knowledge_gap.dart';
 import 'package:engram/src/models/knowledge_graph.dart';
 import 'package:engram/src/models/network_health.dart';
@@ -191,6 +192,118 @@ void main() {
 
       expect(find.text('No matching documents found'), findsOneWidget);
     });
+
+    group('one-tap ingest', () {
+      final testGap = KnowledgeGap(
+        type: GapType.clusterIsolation,
+        description: 'Gap',
+        severity: 0.5,
+        bridgePotential: 0.5,
+      );
+
+      final testRec = Recommendation(
+        documentId: 'doc-1',
+        documentTitle: 'ML for DBAs',
+        gap: testGap,
+        score: 0.85,
+        reasoning: 'Bridges ML and databases',
+        predictedNewEdges: const [
+          PredictedEdge(
+            fromConceptName: 'ML',
+            toConceptName: 'SQL',
+            type: RelationshipType.enables,
+            confidence: 0.8,
+          ),
+        ],
+      );
+
+      testWidgets('shows ingest button on recommendation card',
+          (tester) async {
+        final recState = RecommendationState(
+          phase: RecommendationPhase.done,
+          gaps: [testGap],
+          recommendations: [testRec],
+        );
+
+        await tester.pumpWidget(buildApp(gaps: [testGap], recState: recState));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Ingest'), findsOneWidget);
+        expect(find.byType(FilledButton), findsOneWidget);
+      });
+
+      testWidgets('tap shows loading indicator on card', (tester) async {
+        // Start with an ingest already in progress.
+        final recState = RecommendationState(
+          phase: RecommendationPhase.done,
+          gaps: [testGap],
+          recommendations: [testRec],
+          ingestResults: {
+            'doc-1': const RecommendationIngestResult(
+              status: RecommendationIngestStatus.ingesting,
+            ),
+          },
+        );
+
+        await tester.pumpWidget(buildApp(gaps: [testGap], recState: recState));
+        // Don't pumpAndSettle — CircularProgressIndicator is animated.
+        await tester.pump();
+
+        expect(find.byType(CircularProgressIndicator), findsOneWidget);
+        // Ingest button text should not be visible.
+        expect(find.text('Ingest'), findsNothing);
+      });
+
+      testWidgets('completed ingest shows accuracy', (tester) async {
+        final recState = RecommendationState(
+          phase: RecommendationPhase.done,
+          gaps: [testGap],
+          recommendations: [testRec],
+          ingestResults: {
+            'doc-1': const RecommendationIngestResult(
+              status: RecommendationIngestStatus.completed,
+              evaluation: RecommendationEvaluationResult(
+                matchedCount: 3,
+                missedCount: 1,
+                unexpectedCount: 0,
+                totalPredicted: 4,
+                totalActualNew: 3,
+                accuracy: 0.75,
+              ),
+            ),
+          },
+        );
+
+        await tester.pumpWidget(buildApp(gaps: [testGap], recState: recState));
+        await tester.pumpAndSettle();
+
+        expect(find.text('3/4 edges matched'), findsOneWidget);
+        // No ingest button when completed.
+        expect(find.text('Ingest'), findsNothing);
+      });
+
+      testWidgets('error shows retry button', (tester) async {
+        final recState = RecommendationState(
+          phase: RecommendationPhase.done,
+          gaps: [testGap],
+          recommendations: [testRec],
+          ingestResults: {
+            'doc-1': const RecommendationIngestResult(
+              status: RecommendationIngestStatus.error,
+              errorMessage: 'Network timeout',
+            ),
+          },
+        );
+
+        await tester.pumpWidget(buildApp(gaps: [testGap], recState: recState));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Network timeout'), findsOneWidget);
+        expect(find.text('Retry'), findsOneWidget);
+        // No plain "Ingest" button.
+        expect(find.text('Ingest'), findsNothing);
+      });
+    });
   });
 }
 
@@ -205,6 +318,11 @@ class _FixedRecommendationNotifier extends RecommendationNotifier {
 
   @override
   Future<void> findRecommendations({int maxGaps = 3}) async {
+    // No-op in tests.
+  }
+
+  @override
+  Future<void> ingestRecommendation(Recommendation recommendation) async {
     // No-op in tests.
   }
 }

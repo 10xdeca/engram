@@ -360,4 +360,44 @@ void main() {
       expect(result.accuracy, 0.5);
     });
   });
+
+  group('RecommendationEvaluationResult serialization', () {
+    test('fromJson/toJson round-trip preserves all fields', () {
+      const original = RecommendationEvaluationResult(
+        matchedCount: 3,
+        missedCount: 1,
+        unexpectedCount: 2,
+        totalPredicted: 4,
+        totalActualNew: 5,
+        accuracy: 0.75,
+      );
+
+      final json = original.toJson();
+      final restored = RecommendationEvaluationResult.fromJson(json);
+
+      expect(restored.matchedCount, original.matchedCount);
+      expect(restored.missedCount, original.missedCount);
+      expect(restored.unexpectedCount, original.unexpectedCount);
+      expect(restored.totalPredicted, original.totalPredicted);
+      expect(restored.totalActualNew, original.totalActualNew);
+      expect(restored.accuracy, original.accuracy);
+    });
+
+    test('fromJson/toJson round-trip with null accuracy', () {
+      const original = RecommendationEvaluationResult(
+        matchedCount: 0,
+        missedCount: 0,
+        unexpectedCount: 0,
+        totalPredicted: 0,
+        totalActualNew: 0,
+        accuracy: null,
+      );
+
+      final json = original.toJson();
+      final restored = RecommendationEvaluationResult.fromJson(json);
+
+      expect(restored.accuracy, isNull);
+      expect(restored.totalPredicted, 0);
+    });
+  });
 }
