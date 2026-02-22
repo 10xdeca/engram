@@ -30,9 +30,6 @@ RecommendationEvaluationResult evaluateRecommendation({
   final conceptNames = <String, String>{
     for (final c in graphAfter.concepts) c.id: c.name.toLowerCase(),
   };
-  final nameToId = <String, String>{
-    for (final c in graphAfter.concepts) c.name.toLowerCase(): c.id,
-  };
 
   // Find new edges: relationships in graphAfter that weren't in graphBefore.
   final beforeIds = graphBefore.relationships.map((r) => r.id).toSet();
@@ -40,14 +37,15 @@ RecommendationEvaluationResult evaluateRecommendation({
       graphAfter.relationships.where((r) => !beforeIds.contains(r.id)).toList();
 
   // Build a set of actual new edges as normalized name pairs for matching.
+  // Use null byte separator (\x00) to avoid collisions with concept names.
   final actualEdgeKeys = <String>{};
   for (final edge in newEdges) {
     final fromName = conceptNames[edge.fromConceptId];
     final toName = conceptNames[edge.toConceptId];
     if (fromName != null && toName != null) {
-      actualEdgeKeys.add('$fromName|$toName');
+      actualEdgeKeys.add('$fromName\x00$toName');
       // Also add reverse for undirected matching.
-      actualEdgeKeys.add('$toName|$fromName');
+      actualEdgeKeys.add('$toName\x00$fromName');
     }
   }
 
@@ -59,8 +57,8 @@ RecommendationEvaluationResult evaluateRecommendation({
   for (final pred in predicted) {
     final fromKey = pred.fromConceptName.toLowerCase();
     final toKey = pred.toConceptName.toLowerCase();
-    final key = '$fromKey|$toKey';
-    final reverseKey = '$toKey|$fromKey';
+    final key = '$fromKey\x00$toKey';
+    final reverseKey = '$toKey\x00$fromKey';
 
     if (actualEdgeKeys.contains(key) || actualEdgeKeys.contains(reverseKey)) {
       matchedCount++;
@@ -80,8 +78,8 @@ RecommendationEvaluationResult evaluateRecommendation({
     final toName = conceptNames[edge.toConceptId];
     if (fromName == null || toName == null) continue;
 
-    final key = '$fromName|$toName';
-    final reverseKey = '$toName|$fromName';
+    final key = '$fromName\x00$toName';
+    final reverseKey = '$toName\x00$fromName';
     if (countedActual.contains(key)) continue;
     countedActual.add(key);
     countedActual.add(reverseKey);

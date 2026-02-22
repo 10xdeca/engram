@@ -114,10 +114,11 @@ class KnowledgeGap {
       other is KnowledgeGap &&
           other.type == type &&
           other.description == description &&
-          other.severity == severity;
+          other.severity == severity &&
+          other.bridgePotential == bridgePotential;
 
   @override
-  int get hashCode => Object.hash(type, description, severity);
+  int get hashCode => Object.hash(type, description, severity, bridgePotential);
 
   @override
   String toString() =>

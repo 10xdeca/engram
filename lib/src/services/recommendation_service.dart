@@ -201,7 +201,12 @@ class RecommendationService {
         )
         .join('\n');
 
-    final conceptList = existingConceptNames.take(50).join(', ');
+    // Truncate to 50 concepts to keep prompt size manageable.
+    final truncated = existingConceptNames.take(50).toList();
+    final conceptList = truncated.join(', ');
+    final truncationNote = existingConceptNames.length > 50
+        ? ' (showing 50 of ${existingConceptNames.length})'
+        : '';
 
     final response = await _client.createMessage(
       request: CreateMessageRequest(
@@ -221,7 +226,7 @@ class RecommendationService {
               '## Gap\n'
               'Type: ${gap.type.name}\n'
               'Description: ${gap.description}\n\n'
-              '## Existing concepts in the graph\n'
+              '## Existing concepts in the graph$truncationNote\n'
               '$conceptList\n\n'
               '## Candidate documents\n'
               '$candidateList',

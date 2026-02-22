@@ -41,7 +41,7 @@ void main() {
       expect(gap.suggestedSearchTerms, isEmpty);
     });
 
-    test('equality based on type + description + severity', () {
+    test('equality based on type + description + severity + bridgePotential', () {
       final gap1 = KnowledgeGap(
         type: GapType.clusterIsolation,
         description: 'Same gap',
@@ -53,12 +53,30 @@ void main() {
         type: GapType.clusterIsolation,
         description: 'Same gap',
         severity: 0.7,
-        bridgePotential: 0.9, // different bridgePotential
-        involvedConceptIds: ['c1'], // different concepts
+        bridgePotential: 0.5,
+        involvedConceptIds: ['c1'], // different concepts — still equal
       );
 
       expect(gap1, equals(gap2));
       expect(gap1.hashCode, gap2.hashCode);
+    });
+
+    test('different bridgePotential makes gaps unequal', () {
+      final gap1 = KnowledgeGap(
+        type: GapType.clusterIsolation,
+        description: 'Same gap',
+        severity: 0.7,
+        bridgePotential: 0.5,
+      );
+
+      final gap2 = KnowledgeGap(
+        type: GapType.clusterIsolation,
+        description: 'Same gap',
+        severity: 0.7,
+        bridgePotential: 0.9,
+      );
+
+      expect(gap1, isNot(equals(gap2)));
     });
 
     test('different type or description are not equal', () {

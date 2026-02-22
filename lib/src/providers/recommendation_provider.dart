@@ -96,16 +96,21 @@ class RecommendationNotifier extends Notifier<RecommendationState> {
 
       state = state.copyWith(phase: RecommendationPhase.evaluating);
 
+      // Parallelize gap recommendations — each gap searches + evaluates
+      // independently, then we deduplicate across results.
+      final results = await Future.wait([
+        for (final gap in topGaps)
+          service.recommend(
+            gap: gap,
+            existingConceptNames: existingConceptNames,
+            ingestedDocumentIds: ingestedDocIds,
+          ),
+      ]);
+
       final allRecommendations = <Recommendation>[];
       final seenDocIds = <String>{};
 
-      for (final gap in topGaps) {
-        final recs = await service.recommend(
-          gap: gap,
-          existingConceptNames: existingConceptNames,
-          ingestedDocumentIds: ingestedDocIds,
-        );
-
+      for (final recs in results) {
         // Deduplicate across gaps (same doc might fill multiple).
         for (final rec in recs) {
           if (seenDocIds.add(rec.documentId)) {
