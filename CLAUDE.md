@@ -56,7 +56,7 @@ When starting a new session, remind the user about these architectural decisions
 - `docs/GRAPH_STATE_MANAGEMENT.md` — Analysis of graph-based state management options. Decision: stay with Riverpod, normalize incrementally. Split `graphStructureProvider` from quiz item state to avoid wasted recomputation.
 - `docs/LOCAL_FIRST.md` — Local-first architecture plan. Decision: migrate to Drift/SQLite as primary storage, Firestore as sync peer. Device is source of truth; server handles compute, sync, and social coordination.
 - `docs/CRDT_SYNC_ARCHITECTURE.md` — CRDT sync design for local-first. Knowledge graph operations map naturally to G-Set, LWW-Register, and G-Counter CRDTs. Cooperative game features are accidentally CRDT-native.
-- `docs/FSRS_MIGRATION.md` — Migration from SM-2 to FSRS (Phases 1-3 complete). Key insight: FSRS has a Difficulty parameter that is a property of the card (not the learner), so Claude can predict it at extraction time — closing the loop between extraction and scheduling. Also enables per-concept `desired_retention` based on graph position, solves ease hell via mean reversion, and gives cooperative game mechanics (guardians, repair missions) a principled scheduling foundation. Phase 4 (extraction-informed D₀) is next.
+- `docs/FSRS_MIGRATION.md` — Migration from SM-2 to FSRS (Phases 1-4 complete). Key insight: FSRS has a Difficulty parameter that is a property of the card (not the learner), so Claude can predict it at extraction time — closing the loop between extraction and scheduling. Also enables per-concept `desired_retention` based on graph position, solves ease hell via mean reversion, and gives cooperative game mechanics (guardians, repair missions) a principled scheduling foundation.
 
 ## Open Issues
 
@@ -98,14 +98,12 @@ Current state: App running on macOS. FSRS Phase 1 merged. Knowledge graph animat
 - ✓ Tech debt sweep PR 2 — #29 `StreamNotifier` migration (challenge + nudge), #9 ingest helper extraction, #16 auth_provider tests (#83)
 - ✓ **#61** — Preserve team node positions across graph rebuilds (#85)
 - ✓ Tech debt sweep PR 3 — #18 closed (all deps active), #14 GraphMigrator doc, #15 non-destructive Firestore save, #25 DateTime timestamps across 12 models, #28 friend discovery opt-in
+- ✓ **FSRS Phase 4** — Extraction-informed scheduling (#95): 4a `predictedDifficulty` (write-once) + `reviewCount` on `QuizItem`; 4b `evaluatePredictions()` pure function with MAE + per-band accuracy, dashboard prediction card; 4c calibration feedback loop — extraction prompt receives past prediction accuracy; 4d auto sub-concept splitting for `predictedDifficulty > 8` (capped at 3/doc, non-fatal, deduped by parent concept, composition relationships, UUID IDs)
 
 ### Next up
-1. **FSRS Phase 4** — Extraction-informed scheduling: Claude predicts D₀ at extraction time, difficulty prediction evaluation, feedback loop, auto sub-concept suggestion
-
-### Longer-term
-2. **#40** — Local-first Drift/SQLite migration (schema should account for FSRS D/S/R fields)
-3. **#41** — CRDT sync layer (depends on #40; FSRS state needs LWW-Register per field)
-4. **#39** — Concept embeddings (#38 done; embedding similarity could predict confusion-based difficulty for FSRS)
+1. **#40** — Local-first Drift/SQLite migration (schema should account for FSRS D/S/R fields)
+2. **#41** — CRDT sync layer (depends on #40; FSRS state needs LWW-Register per field)
+3. **#39** — Concept embeddings (#38 done; embedding similarity could predict confusion-based difficulty for FSRS)
 
 ### Learning Science Features (Issues #74–#78)
 8. **#74** — Video-synchronized knowledge graph highlighting — nodes light up in sync with video playback, connected nodes glow with relationship explanations. Based on Mayer's signaling principle (g=0.38–0.53) and temporal contiguity (d=1.22)
