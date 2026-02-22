@@ -160,12 +160,12 @@ Alternative: [`fsrs-rs-dart`](https://github.com/open-spaced-repetition/fsrs-rs-
 4. **Simplify mastery/analysis** — `masteryStateOf` uses FSRS retrievability only, `isConceptMastered` uses `fsrsState >= 2`, challenge dialog uses `isMasteredForUnlock`
 5. **Test migration** — shared `testQuizItem()` helper, all 18 test files updated to FSRS-only assertions
 
-### Phase 4: Extraction-informed scheduling (the closed loop)
+### Phase 4: Extraction-informed scheduling (the closed loop) ✓
 
-1. **Claude predicts difficulty at extraction time** — added to tool schema in Phase 1, now used by scheduler
-2. **Difficulty prediction evaluation** — compare Claude's predicted D₀ with actual D after 5+ reviews per card
-3. **Feedback loop** — if predictions are consistently off, adjust extraction prompt (or retrain with review data)
-4. **Auto sub-concept suggestion** — if predicted difficulty > 8, suggest splitting at extraction time
+1. **Preserve original prediction** — `predictedDifficulty` (write-once) and `reviewCount` fields on `QuizItem`, surviving FSRS mean reversion
+2. **Difficulty prediction evaluation** — pure-function `evaluatePredictions()` computes MAE and per-band accuracy (low/medium/high) after 5+ reviews; dashboard stats card shows results
+3. **Calibration feedback loop** — extraction service accepts `DifficultyEvaluationResult` and appends calibration note to Claude's prompt with past prediction accuracy
+4. **Auto sub-concept splitting** — quiz items with `predictedDifficulty > 8` are automatically split via `generateSubConcepts()` during ingestion (capped at 3 per document, non-fatal failures)
 
 ## Interactions with Other Planned Work
 
