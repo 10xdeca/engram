@@ -239,7 +239,7 @@ void main() {
     });
 
     test('pre-existing edges are not counted as new', () {
-      final existingEdge = const Relationship(
+      const existingEdge = Relationship(
         id: 'r-old',
         fromConceptId: 'a',
         toConceptId: 'b',

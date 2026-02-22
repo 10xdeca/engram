@@ -240,16 +240,16 @@ void main() {
       when(
         () => mockClaude.createMessage(request: any(named: 'request')),
       ).thenAnswer(
-        (_) async => Message(
+        (_) async => const Message(
           id: 'msg-test',
           role: MessageRole.assistant,
           stopReason: StopReason.endTurn,
           content: MessageContent.blocks([
-            const Block.text(text: 'I cannot evaluate these documents.'),
+            Block.text(text: 'I cannot evaluate these documents.'),
           ]),
           model: 'claude-sonnet-4-5-20250929',
           type: 'message',
-          usage: const Usage(inputTokens: 10, outputTokens: 10),
+          usage: Usage(inputTokens: 10, outputTokens: 10),
         ),
       );
 

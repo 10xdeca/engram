@@ -1,6 +1,5 @@
 import '../models/knowledge_graph.dart';
 import '../models/recommendation.dart';
-import '../models/relationship.dart';
 
 /// Evaluate how well a recommendation's predicted edges matched actual
 /// edges created by ingesting the document.

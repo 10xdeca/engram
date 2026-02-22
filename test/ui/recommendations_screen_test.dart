@@ -158,7 +158,7 @@ void main() {
     });
 
     testWidgets('shows error message on error phase', (tester) async {
-      final recState = RecommendationState(
+      const recState = RecommendationState(
         phase: RecommendationPhase.error,
         errorMessage: 'Network timeout',
       );
