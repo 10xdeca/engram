@@ -11,10 +11,12 @@ QuizItem testQuizItem({
   int interval = 0,
   DateTime? nextReview,
   DateTime? lastReview,
-  double difficulty = 5.0,
+  double? difficulty = 5.0,
   double stability = 3.26,
   int fsrsState = 1,
   int lapses = 0,
+  double? predictedDifficulty,
+  int reviewCount = 0,
 }) {
   return QuizItem(
     id: id,
@@ -28,6 +30,8 @@ QuizItem testQuizItem({
     stability: stability,
     fsrsState: fsrsState,
     lapses: lapses,
+    predictedDifficulty: predictedDifficulty,
+    reviewCount: reviewCount,
   );
 }
 
@@ -40,6 +44,8 @@ QuizItem masteredQuizItem({
   String question = 'What is X?',
   String answer = 'X is Y',
   DateTime? lastReview,
+  double? predictedDifficulty,
+  int reviewCount = 0,
 }) {
   return QuizItem(
     id: id,
@@ -53,5 +59,7 @@ QuizItem masteredQuizItem({
     stability: 25.0,
     fsrsState: 2, // review state
     lapses: 0,
+    predictedDifficulty: predictedDifficulty,
+    reviewCount: reviewCount,
   );
 }

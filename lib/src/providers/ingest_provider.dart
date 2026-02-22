@@ -5,10 +5,16 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../models/concept.dart';
 import '../models/ingest_document.dart';
 import '../models/ingest_state.dart';
+import '../models/knowledge_graph.dart';
+import '../models/quiz_item.dart';
+import '../models/relationship.dart';
 import '../models/topic.dart';
+import '../services/extraction_service.dart';
 import 'clock_provider.dart';
+import 'difficulty_evaluation_provider.dart';
 import 'graph_store_provider.dart';
 import 'knowledge_graph_provider.dart';
 import 'service_providers.dart';
@@ -222,6 +228,7 @@ class IngestNotifier extends Notifier<IngestState> {
     try {
       final client = ref.read(outlineClientProvider);
       final extraction = ref.read(extractionServiceProvider);
+      final predictionAccuracy = ref.read(difficultyEvaluationProvider);
 
       // Build the list of documents to process from the selected IDs
       final docsToProcess =
@@ -307,7 +314,7 @@ class IngestNotifier extends Notifier<IngestState> {
 
         // Extract knowledge via Claude API — pass ALL existing concept IDs
         // (full graph, not just topic) so Claude can create cross-document
-        // relationships.
+        // relationships. Include prediction accuracy for calibration feedback.
         state = state.copyWith(
           statusMessage: 'Extracting knowledge (${content.length} chars)...',
         );
@@ -321,6 +328,7 @@ class IngestNotifier extends Notifier<IngestState> {
               documentTitle: docTitle,
               documentContent: content,
               existingConceptIds: graph.concepts.map((c) => c.id).toList(),
+              predictionAccuracy: predictionAccuracy,
             )
             .timeout(
               const Duration(minutes: 3),
@@ -337,18 +345,25 @@ class IngestNotifier extends Notifier<IngestState> {
           '${result.quizItems.length} quiz items',
         );
 
+        // Auto-split high-difficulty items into sub-concepts
+        final augmented = await _autoSplitHighDifficulty(
+          result,
+          extraction,
+          docId,
+        );
+
         // Merge into graph with staggered animation
         state = state.copyWith(
-          statusMessage: 'Adding ${result.concepts.length} concepts...',
+          statusMessage: 'Adding ${augmented.concepts.length} concepts...',
           sessionConceptIds: state.sessionConceptIds.addAll(
-            result.concepts.map((c) => c.id),
+            augmented.concepts.map((c) => c.id),
           ),
         );
         debugPrint('[Ingest] Adding concepts to graph...');
         try {
           await graphNotifier
               .staggeredIngestExtraction(
-                result,
+                augmented,
                 documentId: docId,
                 documentTitle: docTitle,
                 updatedAt: updatedAt,
@@ -380,7 +395,7 @@ class IngestNotifier extends Notifier<IngestState> {
         state = state.copyWith(
           processedDocuments: extracted + skipped,
           extractedCount: extracted,
-          statusMessage: '${result.concepts.length} concepts extracted',
+          statusMessage: '${augmented.concepts.length} concepts extracted',
         );
       }
 
@@ -436,6 +451,7 @@ class IngestNotifier extends Notifier<IngestState> {
       final client = ref.read(outlineClientProvider);
       final extraction = ref.read(extractionServiceProvider);
       final graphNotifier = ref.read(knowledgeGraphProvider.notifier);
+      final predictionAccuracy = ref.read(difficultyEvaluationProvider);
 
       final collectionId = collection['id'] as String;
       final collectionName = collection['name'] as String?;
@@ -523,7 +539,8 @@ class IngestNotifier extends Notifier<IngestState> {
           continue;
         }
 
-        // Extract knowledge via Claude API
+        // Extract knowledge via Claude API — include prediction accuracy
+        // for calibration feedback.
         state = state.copyWith(
           statusMessage: 'Extracting knowledge (${content.length} chars)...',
         );
@@ -537,6 +554,7 @@ class IngestNotifier extends Notifier<IngestState> {
               documentTitle: docTitle,
               documentContent: content,
               existingConceptIds: graph.concepts.map((c) => c.id).toList(),
+              predictionAccuracy: predictionAccuracy,
             )
             .timeout(
               const Duration(minutes: 3),
@@ -553,20 +571,27 @@ class IngestNotifier extends Notifier<IngestState> {
           '${result.quizItems.length} quiz items',
         );
 
+        // Auto-split high-difficulty items into sub-concepts
+        final augmented = await _autoSplitHighDifficulty(
+          result,
+          extraction,
+          docId,
+        );
+
         // Merge into graph — staggered for live knowledge graph animation.
         // Register session concept IDs first so the live graph filter can
         // show nodes as they appear during staggered ingestion.
         state = state.copyWith(
-          statusMessage: 'Adding ${result.concepts.length} concepts...',
+          statusMessage: 'Adding ${augmented.concepts.length} concepts...',
           sessionConceptIds: state.sessionConceptIds.addAll(
-            result.concepts.map((c) => c.id),
+            augmented.concepts.map((c) => c.id),
           ),
         );
         debugPrint('[Ingest] Adding concepts to graph...');
         try {
           await graphNotifier
               .staggeredIngestExtraction(
-                result,
+                augmented,
                 documentId: docId,
                 documentTitle: docTitle,
                 updatedAt: updatedAt,
@@ -598,7 +623,7 @@ class IngestNotifier extends Notifier<IngestState> {
         state = state.copyWith(
           processedDocuments: extracted + skipped,
           extractedCount: extracted,
-          statusMessage: '${result.concepts.length} concepts extracted',
+          statusMessage: '${augmented.concepts.length} concepts extracted',
         );
       }
 
@@ -625,6 +650,94 @@ class IngestNotifier extends Notifier<IngestState> {
         errorMessage: 'Ingestion failed: $e',
       );
     }
+  }
+
+  /// Auto-split quiz items with `predictedDifficulty > 8` into sub-concepts.
+  ///
+  /// Takes at most 3 items per document to avoid excessive API calls.
+  /// Failures are non-fatal — the original high-difficulty items are kept
+  /// regardless (FSRS mean reversion will adjust difficulty over time).
+  Future<ExtractionResult> _autoSplitHighDifficulty(
+    ExtractionResult result,
+    ExtractionService extraction,
+    String documentId,
+  ) async {
+    // Deduplicate by parent concept — multiple quiz items may reference
+    // the same concept, but we only need to split each concept once.
+    final seenConceptIds = <String>{};
+    final itemsToSplit = <QuizItem>[];
+    for (final item in result.quizItems) {
+      if (item.predictedDifficulty != null &&
+          item.predictedDifficulty! > 8.0 &&
+          seenConceptIds.add(item.conceptId)) {
+        itemsToSplit.add(item);
+        if (itemsToSplit.length >= 3) break;
+      }
+    }
+
+    if (itemsToSplit.isEmpty) return result;
+
+    final newConcepts = <Concept>[];
+    final newRelationships = <Relationship>[];
+    final newQuizItems = <QuizItem>[];
+
+    for (final item in itemsToSplit) {
+      final parentConcept = result.concepts
+          .where((c) => c.id == item.conceptId)
+          .firstOrNull;
+      if (parentConcept == null) continue;
+
+      state = state.copyWith(
+        statusMessage: 'Splitting complex concept: ${parentConcept.name}...',
+      );
+      debugPrint(
+        '[Ingest] Auto-splitting "${parentConcept.name}" '
+        '(difficulty ${item.predictedDifficulty})',
+      );
+
+      try {
+        final suggestion = await extraction.generateSubConcepts(
+          parentConceptId: parentConcept.id,
+          parentName: parentConcept.name,
+          parentDescription: parentConcept.description,
+          quizQuestion: item.question,
+          quizAnswer: item.answer,
+          sourceDocumentId: documentId,
+        );
+
+        for (final entry in suggestion.entries) {
+          newConcepts.add(entry.concept);
+          newQuizItems.addAll(entry.quizItems);
+          // Add composition relationship: sub-concept is part of parent
+          newRelationships.add(
+            Relationship(
+              id: const Uuid().v4(),
+              fromConceptId: entry.concept.id,
+              toConceptId: parentConcept.id,
+              label: 'is part of',
+              type: RelationshipType.composition,
+            ),
+          );
+        }
+
+        debugPrint(
+          '[Ingest] Split into ${suggestion.entries.length} sub-concepts',
+        );
+      } catch (e) {
+        debugPrint(
+          '[Ingest] Auto-split failed for "${parentConcept.name}": $e',
+        );
+        // Non-fatal — keep the original high-difficulty item
+      }
+    }
+
+    if (newConcepts.isEmpty) return result;
+
+    return ExtractionResult(
+      concepts: [...result.concepts, ...newConcepts],
+      relationships: [...result.relationships, ...newRelationships],
+      quizItems: [...result.quizItems, ...newQuizItems],
+    );
   }
 
   void reset() {

@@ -1,4 +1,5 @@
 import 'package:anthropic_sdk_dart/anthropic_sdk_dart.dart';
+import 'package:engram/src/engine/difficulty_evaluation.dart';
 import 'package:engram/src/models/relationship.dart';
 import 'package:engram/src/services/extraction_service.dart';
 import 'package:mocktail/mocktail.dart';
@@ -337,5 +338,105 @@ void main() {
         );
       },
     );
+  });
+
+  group('ExtractionService calibration feedback', () {
+    test('includes calibration note when predictionAccuracy is provided',
+        () async {
+      CreateMessageRequest? capturedRequest;
+
+      when(
+        () => mockClient.createMessage(request: any(named: 'request')),
+      ).thenAnswer((invocation) async {
+        capturedRequest =
+            invocation.namedArguments[#request] as CreateMessageRequest;
+        return _toolUseMessage({
+          'concepts': [],
+          'relationships': [],
+          'quizItems': [],
+        });
+      });
+
+      const evaluation = DifficultyEvaluationResult(
+        evaluatedCount: 10,
+        totalPredicted: 15,
+        meanAbsoluteError: 1.5,
+        bandAccuracy: {
+          'low': BandAccuracy(correct: 3, predicted: 4),
+          'medium': BandAccuracy(correct: 4, predicted: 5),
+          'high': BandAccuracy(correct: 0, predicted: 1),
+        },
+      );
+
+      await service.extract(
+        documentTitle: 'Test Doc',
+        documentContent: 'Test content',
+        predictionAccuracy: evaluation,
+      );
+
+      expect(capturedRequest, isNotNull);
+      final message = capturedRequest!.messages.first;
+      final text = (message.content as MessageContentText).value;
+
+      expect(text, contains('Difficulty calibration'));
+      expect(text, contains('10 cards'));
+      expect(text, contains('1.5'));
+      expect(text, contains('Low band (1-3): 3/4 correct'));
+      expect(text, contains('Medium band (4-6): 4/5 correct'));
+      expect(text, contains('High band (7-10): 0/1 correct'));
+    });
+
+    test('omits calibration note when predictionAccuracy is null', () async {
+      CreateMessageRequest? capturedRequest;
+
+      when(
+        () => mockClient.createMessage(request: any(named: 'request')),
+      ).thenAnswer((invocation) async {
+        capturedRequest =
+            invocation.namedArguments[#request] as CreateMessageRequest;
+        return _toolUseMessage({
+          'concepts': [],
+          'relationships': [],
+          'quizItems': [],
+        });
+      });
+
+      await service.extract(
+        documentTitle: 'Test Doc',
+        documentContent: 'Test content',
+      );
+
+      expect(capturedRequest, isNotNull);
+      final message = capturedRequest!.messages.first;
+      final text = (message.content as MessageContentText).value;
+      expect(text, isNot(contains('Difficulty calibration')));
+    });
+
+    test('omits calibration note when evaluatedCount is 0', () async {
+      CreateMessageRequest? capturedRequest;
+
+      when(
+        () => mockClient.createMessage(request: any(named: 'request')),
+      ).thenAnswer((invocation) async {
+        capturedRequest =
+            invocation.namedArguments[#request] as CreateMessageRequest;
+        return _toolUseMessage({
+          'concepts': [],
+          'relationships': [],
+          'quizItems': [],
+        });
+      });
+
+      await service.extract(
+        documentTitle: 'Test Doc',
+        documentContent: 'Test content',
+        predictionAccuracy: DifficultyEvaluationResult.empty(),
+      );
+
+      expect(capturedRequest, isNotNull);
+      final message = capturedRequest!.messages.first;
+      final text = (message.content as MessageContentText).value;
+      expect(text, isNot(contains('Difficulty calibration')));
+    });
   });
 }

@@ -1,5 +1,6 @@
 import 'package:anthropic_sdk_dart/anthropic_sdk_dart.dart';
 
+import '../engine/difficulty_evaluation.dart';
 import '../models/concept.dart';
 import '../models/knowledge_graph.dart';
 import '../models/quiz_item.dart';
@@ -238,6 +239,7 @@ class ExtractionService {
     required String documentTitle,
     required String documentContent,
     List<String> existingConceptIds = const [],
+    DifficultyEvaluationResult? predictionAccuracy,
   }) async {
     final existingIdsNote =
         existingConceptIds.isNotEmpty
@@ -245,6 +247,8 @@ class ExtractionService {
                 'when referring to the same concepts):\n'
                 '${existingConceptIds.join(', ')}\n'
             : '';
+
+    final calibrationNote = _buildCalibrationNote(predictionAccuracy);
 
     final response = await _client.createMessage(
       request: CreateMessageRequest(
@@ -261,7 +265,7 @@ class ExtractionService {
             role: MessageRole.user,
             content: MessageContent.text(
               'Extract knowledge from this document.'
-              '$existingIdsNote\n\n'
+              '$existingIdsNote$calibrationNote\n\n'
               '# $documentTitle\n\n'
               '$documentContent',
             ),
@@ -351,6 +355,39 @@ class ExtractionService {
     }
 
     return _parseSplitResult(toolInput, parentConceptId, sourceDocumentId);
+  }
+
+  /// Builds a calibration note from past prediction accuracy data.
+  ///
+  /// Returns empty string when there's no meaningful data to share.
+  String _buildCalibrationNote(DifficultyEvaluationResult? evaluation) {
+    if (evaluation == null || evaluation.evaluatedCount == 0) return '';
+
+    final mae = evaluation.meanAbsoluteError;
+    final buf = StringBuffer()
+      ..writeln()
+      ..writeln()
+      ..writeln('Difficulty calibration from your past predictions on this graph:')
+      ..writeln('- Evaluated ${evaluation.evaluatedCount} cards with 5+ reviews');
+    if (mae != null) {
+      buf.writeln('- Mean absolute error: ${mae.toStringAsFixed(1)}/10');
+    }
+    for (final band in ['low', 'medium', 'high']) {
+      final accuracy = evaluation.bandAccuracy[band];
+      if (accuracy != null) {
+        final label = switch (band) {
+          'low' => 'Low band (1-3)',
+          'medium' => 'Medium band (4-6)',
+          'high' => 'High band (7-10)',
+          _ => band,
+        };
+        buf.writeln(
+          '- $label: ${accuracy.correct}/${accuracy.predicted} correct',
+        );
+      }
+    }
+    buf.write('Adjust your difficulty predictions accordingly.');
+    return buf.toString();
   }
 
   SubConceptSuggestion _parseSplitResult(

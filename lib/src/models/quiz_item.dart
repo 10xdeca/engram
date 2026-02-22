@@ -25,6 +25,8 @@ class QuizItem {
     this.stability,
     this.fsrsState,
     this.lapses,
+    this.predictedDifficulty,
+    this.reviewCount = 0,
   });
 
   /// Creates a new card with FSRS state bootstrapped.
@@ -57,6 +59,7 @@ class QuizItem {
       stability: fsrs.stability,
       fsrsState: fsrs.fsrsState,
       lapses: fsrs.lapses,
+      predictedDifficulty: predictedDifficulty,
     );
   }
 
@@ -70,6 +73,9 @@ class QuizItem {
     final stability = (json['stability'] as num?)?.toDouble();
     final fsrsState = json['fsrsState'] as int?;
     final lapses = json['lapses'] as int?;
+    final predictedDifficulty =
+        (json['predictedDifficulty'] as num?)?.toDouble();
+    final reviewCount = (json['reviewCount'] as num?)?.toInt() ?? 0;
 
     // Auto-migrate: bootstrap FSRS state for legacy cards.
     if (stability == null || fsrsState == null) {
@@ -91,6 +97,8 @@ class QuizItem {
         stability: fsrs.stability,
         fsrsState: fsrs.fsrsState,
         lapses: fsrs.lapses,
+        predictedDifficulty: predictedDifficulty,
+        reviewCount: reviewCount,
       );
     }
 
@@ -109,6 +117,8 @@ class QuizItem {
       stability: stability,
       fsrsState: fsrsState,
       lapses: lapses,
+      predictedDifficulty: predictedDifficulty,
+      reviewCount: reviewCount,
     );
   }
 
@@ -132,6 +142,19 @@ class QuizItem {
 
   /// Number of times the card lapsed (review → relearning).
   final int? lapses;
+
+  /// Claude's original extraction-time difficulty prediction (1.0-10.0).
+  ///
+  /// Write-once at extraction, never modified by FSRS reviews. Used to
+  /// evaluate prediction accuracy after enough reviews (see [reviewCount]).
+  /// Null for cards created before Phase 4 or without a prediction.
+  final double? predictedDifficulty;
+
+  /// Number of FSRS reviews this card has received.
+  ///
+  /// Incremented on each [withFsrsReview] call. Used to gate prediction
+  /// evaluation (requires 5+ reviews for meaningful comparison).
+  final int reviewCount;
 
   /// Whether this card has full FSRS state.
   ///
@@ -168,6 +191,8 @@ class QuizItem {
       stability: stability,
       fsrsState: fsrsState,
       lapses: lapses,
+      predictedDifficulty: predictedDifficulty,
+      reviewCount: reviewCount + 1,
     );
   }
 
@@ -182,6 +207,7 @@ class QuizItem {
     'question': question,
     'answer': answer,
     if (difficulty != null) 'difficulty': difficulty,
+    if (predictedDifficulty != null) 'predictedDifficulty': predictedDifficulty,
   };
 
   Map<String, dynamic> toJson() => {
@@ -196,6 +222,8 @@ class QuizItem {
     if (stability != null) 'stability': stability,
     if (fsrsState != null) 'fsrsState': fsrsState,
     if (lapses != null) 'lapses': lapses,
+    if (predictedDifficulty != null) 'predictedDifficulty': predictedDifficulty,
+    if (reviewCount > 0) 'reviewCount': reviewCount,
   };
 
   @override

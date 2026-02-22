@@ -174,6 +174,110 @@ void main() {
     });
   });
 
+  group('predictedDifficulty and reviewCount', () {
+    test('newCard stores predictedDifficulty separately from FSRS difficulty',
+        () {
+      final item = QuizItem.newCard(
+        id: 'q1',
+        conceptId: 'c1',
+        question: 'Q?',
+        answer: 'A.',
+        predictedDifficulty: 7.0,
+        now: now,
+      );
+
+      // FSRS difficulty is processed (clamped, used for init)
+      expect(item.difficulty, closeTo(7.0, 0.01));
+      // predictedDifficulty preserves the raw extraction value
+      expect(item.predictedDifficulty, 7.0);
+      expect(item.reviewCount, 0);
+    });
+
+    test('newCard without predictedDifficulty leaves field null', () {
+      final item = QuizItem.newCard(
+        id: 'q1',
+        conceptId: 'c1',
+        question: 'Q?',
+        answer: 'A.',
+        now: now,
+      );
+
+      expect(item.predictedDifficulty, isNull);
+      expect(item.reviewCount, 0);
+    });
+
+    test('predictedDifficulty preserved across withFsrsReview', () {
+      final item = QuizItem(
+        id: 'q1',
+        conceptId: 'c1',
+        question: 'Q?',
+        answer: 'A.',
+        interval: 0,
+        nextReview: now,
+        lastReview: null,
+        difficulty: 7.0,
+        stability: 3.26,
+        fsrsState: 1,
+        lapses: 0,
+        predictedDifficulty: 7.0,
+      );
+
+      final reviewed = item.withFsrsReview(
+        difficulty: 6.5,
+        stability: 8.0,
+        fsrsState: 2,
+        lapses: 0,
+        interval: 8,
+        nextReview: now.add(const Duration(days: 8)),
+        now: now,
+      );
+
+      // FSRS difficulty changed
+      expect(reviewed.difficulty, 6.5);
+      // predictedDifficulty unchanged
+      expect(reviewed.predictedDifficulty, 7.0);
+    });
+
+    test('reviewCount increments on withFsrsReview', () {
+      final item = QuizItem(
+        id: 'q1',
+        conceptId: 'c1',
+        question: 'Q?',
+        answer: 'A.',
+        interval: 0,
+        nextReview: now,
+        lastReview: null,
+        difficulty: 5.0,
+        stability: 3.26,
+        fsrsState: 1,
+        lapses: 0,
+        reviewCount: 0,
+      );
+
+      final reviewed1 = item.withFsrsReview(
+        difficulty: 5.0,
+        stability: 8.0,
+        fsrsState: 2,
+        lapses: 0,
+        interval: 8,
+        nextReview: now.add(const Duration(days: 8)),
+        now: now,
+      );
+      expect(reviewed1.reviewCount, 1);
+
+      final reviewed2 = reviewed1.withFsrsReview(
+        difficulty: 5.0,
+        stability: 15.0,
+        fsrsState: 2,
+        lapses: 0,
+        interval: 15,
+        nextReview: now.add(const Duration(days: 15)),
+        now: now,
+      );
+      expect(reviewed2.reviewCount, 2);
+    });
+  });
+
   group('fromJson / toJson round-trip', () {
     test('legacy SM-2 card auto-migrates to FSRS on fromJson', () {
       final original = QuizItem(
@@ -221,6 +325,72 @@ void main() {
       expect(restored.fsrsState, original.fsrsState);
       expect(restored.lapses, original.lapses);
       expect(restored.isFsrs, isTrue);
+    });
+
+    test('round-trips predictedDifficulty and reviewCount', () {
+      final original = QuizItem(
+        id: 'q1',
+        conceptId: 'c1',
+        question: 'Q?',
+        answer: 'A.',
+        interval: 3,
+        nextReview: now,
+        lastReview: now.subtract(const Duration(days: 3)),
+        difficulty: 6.5,
+        stability: 8.0,
+        fsrsState: 2,
+        lapses: 0,
+        predictedDifficulty: 7.0,
+        reviewCount: 5,
+      );
+
+      final json = original.toJson();
+      expect(json['predictedDifficulty'], 7.0);
+      expect(json['reviewCount'], 5);
+
+      final restored = QuizItem.fromJson(json);
+      expect(restored.predictedDifficulty, 7.0);
+      expect(restored.reviewCount, 5);
+    });
+
+    test('fromJson defaults reviewCount to 0 for legacy JSON', () {
+      final json = {
+        'id': 'q1',
+        'conceptId': 'c1',
+        'question': 'Q?',
+        'answer': 'A.',
+        'interval': 3,
+        'nextReview': now.toIso8601String(),
+        'difficulty': 5.0,
+        'stability': 3.26,
+        'fsrsState': 2,
+        'lapses': 0,
+        // no predictedDifficulty or reviewCount
+      };
+
+      final restored = QuizItem.fromJson(json);
+      expect(restored.predictedDifficulty, isNull);
+      expect(restored.reviewCount, 0);
+    });
+
+    test('toJson omits predictedDifficulty when null', () {
+      final item = QuizItem(
+        id: 'q1',
+        conceptId: 'c1',
+        question: 'Q?',
+        answer: 'A.',
+        interval: 0,
+        nextReview: now,
+        lastReview: null,
+        difficulty: 5.0,
+        stability: 3.26,
+        fsrsState: 1,
+        lapses: 0,
+      );
+
+      final json = item.toJson();
+      expect(json.containsKey('predictedDifficulty'), isFalse);
+      expect(json.containsKey('reviewCount'), isFalse);
     });
   });
 }
