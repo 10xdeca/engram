@@ -4,6 +4,7 @@ import 'package:engram/src/models/concept.dart';
 import 'package:engram/src/models/ingest_state.dart';
 import 'package:engram/src/models/knowledge_graph.dart';
 import 'package:engram/src/models/quiz_item.dart';
+import 'package:engram/src/models/sub_concept_suggestion.dart';
 import 'package:engram/src/providers/ingest_provider.dart';
 import 'package:engram/src/providers/knowledge_graph_provider.dart';
 import 'package:engram/src/providers/service_providers.dart';
@@ -202,6 +203,324 @@ void main() {
       final state = container.read(ingestProvider);
       expect(state.phase, IngestPhase.idle);
       expect(state.selectedCollection, isNull);
+    });
+
+    group('auto-split high-difficulty items', () {
+      late MockClient httpClient;
+
+      setUp(() {
+        httpClient = MockClient((request) async {
+          if (request.url.path == '/api/documents.list') {
+            return http.Response(
+              jsonEncode({
+                'data': [
+                  {
+                    'id': 'doc1',
+                    'title': 'Complex Topic',
+                    'updatedAt': '2025-01-01T00:00:00.000Z',
+                  },
+                ],
+                'pagination': {'total': 1},
+              }),
+              200,
+            );
+          }
+          if (request.url.path == '/api/documents.info') {
+            return http.Response(
+              jsonEncode({
+                'data': {
+                  'id': 'doc1',
+                  'title': 'Complex Topic',
+                  'text': '# Complex\nHard stuff.',
+                },
+              }),
+              200,
+            );
+          }
+          return http.Response('{}', 200);
+        });
+      });
+
+      test('auto-splits items with predictedDifficulty > 8', () async {
+        when(
+          () => mockExtraction.extract(
+            documentTitle: any(named: 'documentTitle'),
+            documentContent: any(named: 'documentContent'),
+            existingConceptIds: any(named: 'existingConceptIds'),
+            predictionAccuracy: any(named: 'predictionAccuracy'),
+          ),
+        ).thenAnswer(
+          (_) async => ExtractionResult(
+            concepts: [
+              Concept(
+                id: 'hard-concept',
+                name: 'Hard Concept',
+                description: 'Very complex',
+                sourceDocumentId: '',
+              ),
+            ],
+            relationships: const [],
+            quizItems: [
+              QuizItem.newCard(
+                id: 'q1',
+                conceptId: 'hard-concept',
+                question: 'Explain everything?',
+                answer: 'Everything is complex.',
+                predictedDifficulty: 9.0,
+              ),
+            ],
+          ),
+        );
+
+        when(
+          () => mockExtraction.generateSubConcepts(
+            parentConceptId: any(named: 'parentConceptId'),
+            parentName: any(named: 'parentName'),
+            parentDescription: any(named: 'parentDescription'),
+            quizQuestion: any(named: 'quizQuestion'),
+            quizAnswer: any(named: 'quizAnswer'),
+            sourceDocumentId: any(named: 'sourceDocumentId'),
+          ),
+        ).thenAnswer(
+          (_) async => SubConceptSuggestion(
+            entries: [
+              SubConceptEntry(
+                concept: Concept(
+                  id: 'hard-concept-part-a',
+                  name: 'Part A',
+                  description: 'First part',
+                  sourceDocumentId: 'doc1',
+                  parentConceptId: 'hard-concept',
+                ),
+                quizItems: [
+                  QuizItem.newCard(
+                    id: 'q-sub-a',
+                    conceptId: 'hard-concept-part-a',
+                    question: 'What is part A?',
+                    answer: 'The first part.',
+                    predictedDifficulty: 5.0,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+
+        final container = createContainer(httpClient: httpClient);
+        await container.read(knowledgeGraphProvider.future);
+
+        container.read(ingestProvider.notifier).selectCollection({
+          'id': 'col1',
+          'name': 'Engineering',
+        });
+        await container.read(ingestProvider.notifier).startIngestion();
+
+        final graph = await container.read(knowledgeGraphProvider.future);
+        // Original concept + sub-concept
+        expect(graph.concepts, hasLength(2));
+        expect(
+          graph.concepts.map((c) => c.id),
+          containsAll(['hard-concept', 'hard-concept-part-a']),
+        );
+        // Original quiz item + sub-concept quiz item
+        expect(graph.quizItems, hasLength(2));
+
+        verify(
+          () => mockExtraction.generateSubConcepts(
+            parentConceptId: 'hard-concept',
+            parentName: 'Hard Concept',
+            parentDescription: 'Very complex',
+            quizQuestion: 'Explain everything?',
+            quizAnswer: 'Everything is complex.',
+            sourceDocumentId: 'doc1',
+          ),
+        ).called(1);
+      });
+
+      test('does not split items with predictedDifficulty <= 8', () async {
+        when(
+          () => mockExtraction.extract(
+            documentTitle: any(named: 'documentTitle'),
+            documentContent: any(named: 'documentContent'),
+            existingConceptIds: any(named: 'existingConceptIds'),
+            predictionAccuracy: any(named: 'predictionAccuracy'),
+          ),
+        ).thenAnswer(
+          (_) async => ExtractionResult(
+            concepts: [
+              Concept(
+                id: 'easy-concept',
+                name: 'Easy Concept',
+                description: 'Simple',
+                sourceDocumentId: '',
+              ),
+            ],
+            relationships: const [],
+            quizItems: [
+              QuizItem.newCard(
+                id: 'q1',
+                conceptId: 'easy-concept',
+                question: 'Simple question?',
+                answer: 'Simple answer.',
+                predictedDifficulty: 6.0,
+              ),
+            ],
+          ),
+        );
+
+        final container = createContainer(httpClient: httpClient);
+        await container.read(knowledgeGraphProvider.future);
+
+        container.read(ingestProvider.notifier).selectCollection({
+          'id': 'col1',
+          'name': 'Engineering',
+        });
+        await container.read(ingestProvider.notifier).startIngestion();
+
+        final graph = await container.read(knowledgeGraphProvider.future);
+        expect(graph.concepts, hasLength(1));
+        expect(graph.quizItems, hasLength(1));
+
+        verifyNever(
+          () => mockExtraction.generateSubConcepts(
+            parentConceptId: any(named: 'parentConceptId'),
+            parentName: any(named: 'parentName'),
+            parentDescription: any(named: 'parentDescription'),
+            quizQuestion: any(named: 'quizQuestion'),
+            quizAnswer: any(named: 'quizAnswer'),
+            sourceDocumentId: any(named: 'sourceDocumentId'),
+          ),
+        );
+      });
+
+      test('continues gracefully when split fails', () async {
+        when(
+          () => mockExtraction.extract(
+            documentTitle: any(named: 'documentTitle'),
+            documentContent: any(named: 'documentContent'),
+            existingConceptIds: any(named: 'existingConceptIds'),
+            predictionAccuracy: any(named: 'predictionAccuracy'),
+          ),
+        ).thenAnswer(
+          (_) async => ExtractionResult(
+            concepts: [
+              Concept(
+                id: 'hard-concept',
+                name: 'Hard Concept',
+                description: 'Very complex',
+                sourceDocumentId: '',
+              ),
+            ],
+            relationships: const [],
+            quizItems: [
+              QuizItem.newCard(
+                id: 'q1',
+                conceptId: 'hard-concept',
+                question: 'Explain everything?',
+                answer: 'Everything is complex.',
+                predictedDifficulty: 9.0,
+              ),
+            ],
+          ),
+        );
+
+        when(
+          () => mockExtraction.generateSubConcepts(
+            parentConceptId: any(named: 'parentConceptId'),
+            parentName: any(named: 'parentName'),
+            parentDescription: any(named: 'parentDescription'),
+            quizQuestion: any(named: 'quizQuestion'),
+            quizAnswer: any(named: 'quizAnswer'),
+            sourceDocumentId: any(named: 'sourceDocumentId'),
+          ),
+        ).thenThrow(Exception('API error'));
+
+        final container = createContainer(httpClient: httpClient);
+        await container.read(knowledgeGraphProvider.future);
+
+        container.read(ingestProvider.notifier).selectCollection({
+          'id': 'col1',
+          'name': 'Engineering',
+        });
+        await container.read(ingestProvider.notifier).startIngestion();
+
+        // Should complete successfully despite split failure
+        final state = container.read(ingestProvider);
+        expect(state.phase, IngestPhase.done);
+
+        // Original item kept
+        final graph = await container.read(knowledgeGraphProvider.future);
+        expect(graph.concepts, hasLength(1));
+        expect(graph.quizItems, hasLength(1));
+      });
+
+      test('caps at 3 splits per document', () async {
+        when(
+          () => mockExtraction.extract(
+            documentTitle: any(named: 'documentTitle'),
+            documentContent: any(named: 'documentContent'),
+            existingConceptIds: any(named: 'existingConceptIds'),
+            predictionAccuracy: any(named: 'predictionAccuracy'),
+          ),
+        ).thenAnswer(
+          (_) async => ExtractionResult(
+            concepts: [
+              for (int i = 0; i < 5; i++)
+                Concept(
+                  id: 'hard-$i',
+                  name: 'Hard $i',
+                  description: 'Complex $i',
+                  sourceDocumentId: '',
+                ),
+            ],
+            relationships: const [],
+            quizItems: [
+              for (int i = 0; i < 5; i++)
+                QuizItem.newCard(
+                  id: 'q-$i',
+                  conceptId: 'hard-$i',
+                  question: 'Q $i?',
+                  answer: 'A $i.',
+                  predictedDifficulty: 9.0,
+                ),
+            ],
+          ),
+        );
+
+        when(
+          () => mockExtraction.generateSubConcepts(
+            parentConceptId: any(named: 'parentConceptId'),
+            parentName: any(named: 'parentName'),
+            parentDescription: any(named: 'parentDescription'),
+            quizQuestion: any(named: 'quizQuestion'),
+            quizAnswer: any(named: 'quizAnswer'),
+            sourceDocumentId: any(named: 'sourceDocumentId'),
+          ),
+        ).thenAnswer(
+          (_) async => SubConceptSuggestion(entries: const []),
+        );
+
+        final container = createContainer(httpClient: httpClient);
+        await container.read(knowledgeGraphProvider.future);
+
+        container.read(ingestProvider.notifier).selectCollection({
+          'id': 'col1',
+          'name': 'Engineering',
+        });
+        await container.read(ingestProvider.notifier).startIngestion();
+
+        // Only 3 splits attempted despite 5 high-difficulty items
+        verify(
+          () => mockExtraction.generateSubConcepts(
+            parentConceptId: any(named: 'parentConceptId'),
+            parentName: any(named: 'parentName'),
+            parentDescription: any(named: 'parentDescription'),
+            quizQuestion: any(named: 'quizQuestion'),
+            quizAnswer: any(named: 'quizAnswer'),
+            sourceDocumentId: any(named: 'sourceDocumentId'),
+          ),
+        ).called(3);
+      });
     });
   });
 }
