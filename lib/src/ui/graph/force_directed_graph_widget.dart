@@ -20,6 +20,17 @@ import 'storm_overlay_painter.dart';
 import 'team_avatar_cache.dart';
 import 'team_node.dart';
 
+/// A [TransformationController] that rejects matrix values with a zero (or
+/// near-zero) determinant, preventing "Matrix cannot be inverted" crashes in
+/// [InteractiveViewer]'s gesture callbacks.
+class _SafeTransformationController extends TransformationController {
+  @override
+  set value(Matrix4 newValue) {
+    if (newValue.determinant().abs() < 1e-10) return; // reject singular matrix
+    super.value = newValue;
+  }
+}
+
 /// Interactive force-directed graph visualization.
 ///
 /// Renders concept nodes with mastery coloring and optional team member avatars.
@@ -92,7 +103,7 @@ class _ForceDirectedGraphWidgetState extends State<ForceDirectedGraphWidget>
   late List<GraphEdge> _edges;
   late Ticker _ticker;
 
-  final _transformController = TransformationController();
+  final _transformController = _SafeTransformationController();
   final _avatarCache = TeamAvatarCache();
   String? _selectedNodeId;
   OverlayEntry? _overlayEntry;
@@ -362,8 +373,10 @@ class _ForceDirectedGraphWidgetState extends State<ForceDirectedGraphWidget>
   Offset _toContentCoords(Offset globalPosition) {
     final RenderBox box = context.findRenderObject()! as RenderBox;
     final viewportLocal = box.globalToLocal(globalPosition);
-    final matrix = _transformController.value.clone()..invert();
-    return MatrixUtils.transformPoint(matrix, viewportLocal);
+    final m = _transformController.value;
+    if (m.determinant().abs() < 1e-10) return viewportLocal;
+    final inverted = m.clone()..invert();
+    return MatrixUtils.transformPoint(inverted, viewportLocal);
   }
 
   /// Convert a global position to viewport-local space (for zoom focal point).
@@ -443,9 +456,9 @@ class _ForceDirectedGraphWidgetState extends State<ForceDirectedGraphWidget>
     // Zoom centered on the tapped viewport point.
     final m =
         Matrix4.identity()
-          ..translateByDouble(viewportLocal.dx, viewportLocal.dy, 0, 0)
-          ..scaleByDouble(zoomFactor, zoomFactor, 1, 1)
-          ..translateByDouble(-viewportLocal.dx, -viewportLocal.dy, 0, 0);
+          ..translate(viewportLocal.dx, viewportLocal.dy)
+          ..scale(zoomFactor, zoomFactor)
+          ..translate(-viewportLocal.dx, -viewportLocal.dy);
     _transformController.value = m * _transformController.value;
   }
 
