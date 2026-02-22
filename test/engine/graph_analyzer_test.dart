@@ -26,16 +26,19 @@ Relationship _rel(
   type: type,
 );
 
-QuizItem _quiz(String id, String conceptId, {int repetitions = 0}) => QuizItem(
+/// FSRS quiz item. [fsrsState] >= 2 means graduated.
+QuizItem _quiz(String id, String conceptId, {int fsrsState = 1}) => QuizItem(
   id: id,
   conceptId: conceptId,
   question: 'Q?',
   answer: 'A.',
-  easeFactor: 2.5,
   interval: 1,
-  repetitions: repetitions,
   nextReview: DateTime.utc(2025, 6, 15),
   lastReview: null,
+  difficulty: 5.0,
+  stability: 3.26,
+  fsrsState: fsrsState,
+  lapses: 0,
 );
 
 /// FSRS quiz item with configurable state.
@@ -48,9 +51,7 @@ QuizItem _fsrsQuiz(
   conceptId: conceptId,
   question: 'Q?',
   answer: 'A.',
-  easeFactor: 2.5,
   interval: 1,
-  repetitions: 0,
   nextReview: DateTime.utc(2025, 6, 15),
   lastReview: null,
   difficulty: 5.0,
@@ -209,78 +210,88 @@ void main() {
     });
   });
 
-  group('isConceptMastered', () {
-    test('concept with no quiz items is mastered', () {
+  group('isConceptGraduated', () {
+    test('concept with no quiz items is graduated', () {
       final graph = KnowledgeGraph(concepts: [_concept('a')]);
       final analyzer = GraphAnalyzer(graph);
-      expect(analyzer.isConceptMastered('a'), isTrue);
+      expect(analyzer.isConceptGraduated('a'), isTrue);
     });
 
-    test('concept with all repetitions >= 1 is mastered', () {
+    test('concept with all fsrsState >= 2 is graduated', () {
       final graph = KnowledgeGraph(
         concepts: [_concept('a')],
         quizItems: [
-          _quiz('q1', 'a', repetitions: 1),
-          _quiz('q2', 'a', repetitions: 3),
+          _quiz('q1', 'a', fsrsState: 2),
+          _quiz('q2', 'a', fsrsState: 3),
         ],
       );
       final analyzer = GraphAnalyzer(graph);
-      expect(analyzer.isConceptMastered('a'), isTrue);
+      expect(analyzer.isConceptGraduated('a'), isTrue);
     });
 
-    test('concept with any repetitions == 0 is not mastered', () {
+    test('concept with any fsrsState < 2 is not graduated', () {
       final graph = KnowledgeGraph(
         concepts: [_concept('a')],
         quizItems: [
-          _quiz('q1', 'a', repetitions: 1),
-          _quiz('q2', 'a', repetitions: 0),
+          _quiz('q1', 'a', fsrsState: 2),
+          _quiz('q2', 'a', fsrsState: 1),
         ],
       );
       final analyzer = GraphAnalyzer(graph);
-      expect(analyzer.isConceptMastered('a'), isFalse);
+      expect(analyzer.isConceptGraduated('a'), isFalse);
     });
 
-    test('unknown concept is mastered (no quiz items)', () {
+    test('unknown concept is graduated (no quiz items)', () {
       final graph = KnowledgeGraph(concepts: [_concept('a')]);
       final analyzer = GraphAnalyzer(graph);
-      expect(analyzer.isConceptMastered('nonexistent'), isTrue);
+      expect(analyzer.isConceptGraduated('nonexistent'), isTrue);
     });
 
-    test('FSRS card in review state (2) is mastered', () {
+    test('FSRS card in review state (2) is graduated', () {
       final graph = KnowledgeGraph(
         concepts: [_concept('a')],
         quizItems: [_fsrsQuiz('q1', 'a', fsrsState: 2)],
       );
       final analyzer = GraphAnalyzer(graph);
-      expect(analyzer.isConceptMastered('a'), isTrue);
+      expect(analyzer.isConceptGraduated('a'), isTrue);
     });
 
-    test('FSRS card in learning state (1) is not mastered', () {
+    test('FSRS card in learning state (1) is not graduated', () {
       final graph = KnowledgeGraph(
         concepts: [_concept('a')],
         quizItems: [_fsrsQuiz('q1', 'a', fsrsState: 1)],
       );
       final analyzer = GraphAnalyzer(graph);
-      expect(analyzer.isConceptMastered('a'), isFalse);
+      expect(analyzer.isConceptGraduated('a'), isFalse);
     });
 
-    test('FSRS card in relearning state (3) is mastered', () {
+    test('FSRS card in relearning state (3) is graduated', () {
       final graph = KnowledgeGraph(
         concepts: [_concept('a')],
         quizItems: [_fsrsQuiz('q1', 'a', fsrsState: 3)],
       );
       final analyzer = GraphAnalyzer(graph);
-      expect(analyzer.isConceptMastered('a'), isTrue);
+      expect(analyzer.isConceptGraduated('a'), isTrue);
     });
 
-    test('SM-2 mastery check unchanged with FSRS changes', () {
-      // SM-2 card with repetitions = 1 should still be mastered
+    test('FSRS card with null fsrsState is not graduated', () {
       final graph = KnowledgeGraph(
         concepts: [_concept('a')],
-        quizItems: [_quiz('q1', 'a', repetitions: 1)],
+        quizItems: [
+          QuizItem(
+            id: 'q1',
+            conceptId: 'a',
+            question: 'Q?',
+            answer: 'A.',
+            interval: 1,
+            nextReview: DateTime.utc(2025, 6, 15),
+            lastReview: null,
+            // No FSRS fields
+          ),
+        ],
       );
       final analyzer = GraphAnalyzer(graph);
-      expect(analyzer.isConceptMastered('a'), isTrue);
+      expect(analyzer.isConceptGraduated('a'), isFalse);
     });
   });
 
@@ -295,7 +306,7 @@ void main() {
       final graph = KnowledgeGraph(
         concepts: [_concept('a'), _concept('b')],
         relationships: [_rel('a', 'b')], // a depends on b
-        quizItems: [_quiz('q1', 'b', repetitions: 1)],
+        quizItems: [_quiz('q1', 'b', fsrsState: 2)],
       );
       final analyzer = GraphAnalyzer(graph);
       expect(analyzer.isConceptUnlocked('a'), isTrue);
@@ -305,7 +316,7 @@ void main() {
       final graph = KnowledgeGraph(
         concepts: [_concept('a'), _concept('b')],
         relationships: [_rel('a', 'b')], // a depends on b
-        quizItems: [_quiz('q1', 'b', repetitions: 0)],
+        quizItems: [_quiz('q1', 'b')], // fsrsState: 1 (learning, not mastered)
       );
       final analyzer = GraphAnalyzer(graph);
       expect(analyzer.isConceptUnlocked('a'), isFalse);
@@ -317,8 +328,8 @@ void main() {
         concepts: [_concept('a'), _concept('b'), _concept('c')],
         relationships: [_rel('c', 'b'), _rel('b', 'a')],
         quizItems: [
-          _quiz('q1', 'a', repetitions: 1), // a mastered
-          _quiz('q2', 'b', repetitions: 0), // b not mastered
+          _quiz('q1', 'a', fsrsState: 2), // a mastered
+          _quiz('q2', 'b'), // b not mastered (learning)
         ],
       );
       final analyzer = GraphAnalyzer(graph);
@@ -341,9 +352,9 @@ void main() {
         _rel('containers', 'images'),
       ],
       quizItems: [
-        _quiz('q1', 'images', repetitions: 0),
-        _quiz('q2', 'containers', repetitions: 0),
-        _quiz('q3', 'compose', repetitions: 0),
+        _quiz('q1', 'images'),
+        _quiz('q2', 'containers'),
+        _quiz('q3', 'compose'),
       ],
     );
     final analyzer = GraphAnalyzer(graph);

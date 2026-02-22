@@ -13,16 +13,19 @@ Concept _concept(String id, {String? parentConceptId}) => Concept(
   parentConceptId: parentConceptId,
 );
 
-QuizItem _quiz(String id, String conceptId, {int repetitions = 0}) => QuizItem(
+/// FSRS quiz item. [fsrsState] >= 2 means graduated.
+QuizItem _quiz(String id, String conceptId, {int fsrsState = 1}) => QuizItem(
   id: id,
   conceptId: conceptId,
   question: 'Q?',
   answer: 'A.',
-  easeFactor: 2.5,
   interval: 1,
-  repetitions: repetitions,
   nextReview: DateTime.utc(2025, 6, 15),
   lastReview: null,
+  difficulty: 5.0,
+  stability: 3.26,
+  fsrsState: fsrsState,
+  lapses: 0,
 );
 
 void main() {
@@ -70,12 +73,12 @@ void main() {
           _concept('child2', parentConceptId: 'parent'),
         ],
         quizItems: [
-          _quiz('q1', 'child1', repetitions: 1),
-          _quiz('q2', 'child2', repetitions: 1),
+          _quiz('q1', 'child1', fsrsState: 2),
+          _quiz('q2', 'child2', fsrsState: 2),
         ],
       );
       final analyzer = GraphAnalyzer(graph);
-      expect(analyzer.isConceptMastered('parent'), isTrue);
+      expect(analyzer.isConceptGraduated('parent'), isTrue);
     });
 
     test('parent is not mastered when any child is not mastered', () {
@@ -86,12 +89,12 @@ void main() {
           _concept('child2', parentConceptId: 'parent'),
         ],
         quizItems: [
-          _quiz('q1', 'child1', repetitions: 1),
-          _quiz('q2', 'child2', repetitions: 0), // not mastered
+          _quiz('q1', 'child1', fsrsState: 2),
+          _quiz('q2', 'child2', fsrsState: 1), // not mastered
         ],
       );
       final analyzer = GraphAnalyzer(graph);
-      expect(analyzer.isConceptMastered('parent'), isFalse);
+      expect(analyzer.isConceptGraduated('parent'), isFalse);
     });
 
     test('parent with no quiz items but children delegates to children', () {
@@ -100,11 +103,11 @@ void main() {
           _concept('parent'),
           _concept('child1', parentConceptId: 'parent'),
         ],
-        quizItems: [_quiz('q1', 'child1', repetitions: 0)],
+        quizItems: [_quiz('q1', 'child1', fsrsState: 1)],
       );
       final analyzer = GraphAnalyzer(graph);
       // Parent has no own quiz items, but has children → delegates
-      expect(analyzer.isConceptMastered('parent'), isFalse);
+      expect(analyzer.isConceptGraduated('parent'), isFalse);
     });
   });
 
@@ -127,7 +130,7 @@ void main() {
           ),
         ],
         quizItems: [
-          _quiz('q1', 'prereq', repetitions: 0), // not mastered
+          _quiz('q1', 'prereq', fsrsState: 1), // not mastered
         ],
       );
       final analyzer = GraphAnalyzer(graph);
@@ -154,7 +157,7 @@ void main() {
           ),
         ],
         quizItems: [
-          _quiz('q1', 'prereq', repetitions: 1), // mastered
+          _quiz('q1', 'prereq', fsrsState: 2), // mastered
         ],
       );
       final analyzer = GraphAnalyzer(graph);
@@ -175,7 +178,7 @@ void main() {
       );
       final analyzer = GraphAnalyzer(graph);
       // Should not hang — cycle guard returns true
-      expect(analyzer.isConceptMastered('a'), isTrue);
+      expect(analyzer.isConceptGraduated('a'), isTrue);
     });
   });
 }

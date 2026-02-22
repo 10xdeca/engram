@@ -11,9 +11,7 @@ void main() {
         conceptId: 'c1',
         question: 'Q?',
         answer: 'A.',
-        easeFactor: 2.5,
         interval: 0,
-        repetitions: 0,
         nextReview: now,
         lastReview: null,
         difficulty: 5.0,
@@ -30,9 +28,7 @@ void main() {
         conceptId: 'c1',
         question: 'Q?',
         answer: 'A.',
-        easeFactor: 2.5,
         interval: 0,
-        repetitions: 0,
         nextReview: now,
         lastReview: null,
         difficulty: 5.0,
@@ -46,9 +42,7 @@ void main() {
         conceptId: 'c1',
         question: 'Q?',
         answer: 'A.',
-        easeFactor: 2.5,
         interval: 0,
-        repetitions: 0,
         nextReview: now,
         lastReview: null,
       );
@@ -61,9 +55,7 @@ void main() {
         conceptId: 'c1',
         question: 'Q?',
         answer: 'A.',
-        easeFactor: 2.5,
         interval: 0,
-        repetitions: 0,
         nextReview: now,
         lastReview: null,
         difficulty: 5.0,
@@ -80,9 +72,7 @@ void main() {
         conceptId: 'c1',
         question: 'Q?',
         answer: 'A.',
-        easeFactor: 2.5,
         interval: 5,
-        repetitions: 3,
         nextReview: now,
         lastReview: null,
         difficulty: 5.0,
@@ -99,9 +89,7 @@ void main() {
         conceptId: 'c1',
         question: 'Q?',
         answer: 'A.',
-        easeFactor: 2.5,
         interval: 25,
-        repetitions: 3,
         nextReview: now,
         lastReview: null,
         difficulty: 5.0,
@@ -112,30 +100,13 @@ void main() {
       expect(item.isMasteredForUnlock, isFalse);
     });
 
-    test('SM-2 card: true when interval >= 21', () {
+    test('false when stability is null', () {
       final item = QuizItem(
         id: 'q1',
         conceptId: 'c1',
         question: 'Q?',
         answer: 'A.',
-        easeFactor: 2.5,
         interval: 25,
-        repetitions: 5,
-        nextReview: now,
-        lastReview: null,
-      );
-      expect(item.isMasteredForUnlock, isTrue);
-    });
-
-    test('SM-2 card: false when interval < 21', () {
-      final item = QuizItem(
-        id: 'q1',
-        conceptId: 'c1',
-        question: 'Q?',
-        answer: 'A.',
-        easeFactor: 2.5,
-        interval: 6,
-        repetitions: 2,
         nextReview: now,
         lastReview: null,
       );
@@ -144,7 +115,7 @@ void main() {
   });
 
   group('newCard', () {
-    test('without predictedDifficulty creates pure SM-2 card', () {
+    test('without predictedDifficulty creates FSRS card with D=5.0', () {
       final item = QuizItem.newCard(
         id: 'q1',
         conceptId: 'c1',
@@ -153,14 +124,13 @@ void main() {
         now: now,
       );
 
-      expect(item.isFsrs, isFalse);
-      expect(item.difficulty, isNull);
-      expect(item.stability, isNull);
-      expect(item.fsrsState, isNull);
-      expect(item.lapses, isNull);
-      expect(item.easeFactor, 2.5);
+      expect(item.isFsrs, isTrue);
+      expect(item.difficulty, 5.0);
+      expect(item.stability, isNotNull);
+      expect(item.stability!, greaterThan(0));
+      expect(item.fsrsState, 1); // learning
+      expect(item.lapses, 0);
       expect(item.interval, 0);
-      expect(item.repetitions, 0);
     });
 
     test('with predictedDifficulty bootstraps full FSRS state', () {
@@ -205,27 +175,29 @@ void main() {
   });
 
   group('fromJson / toJson round-trip', () {
-    test('SM-2 card round-trips correctly', () {
+    test('legacy SM-2 card auto-migrates to FSRS on fromJson', () {
       final original = QuizItem(
         id: 'q1',
         conceptId: 'c1',
         question: 'Q?',
         answer: 'A.',
-        easeFactor: 2.6,
         interval: 6,
-        repetitions: 2,
         nextReview: now,
         lastReview: now.subtract(const Duration(days: 6)),
       );
 
       final restored = QuizItem.fromJson(original.toJson());
       expect(restored.id, original.id);
-      expect(restored.easeFactor, original.easeFactor);
       expect(restored.interval, original.interval);
-      expect(restored.difficulty, isNull);
-      expect(restored.stability, isNull);
-      expect(restored.fsrsState, isNull);
-      expect(restored.lapses, isNull);
+      // Auto-migrated to FSRS
+      expect(restored.isFsrs, isTrue);
+      expect(restored.difficulty, 5.0); // default
+      expect(restored.stability, isNotNull);
+      expect(restored.fsrsState, isNotNull);
+      expect(restored.lapses, isNotNull);
+      // Preserves scheduling state
+      expect(restored.nextReview, original.nextReview);
+      expect(restored.lastReview, original.lastReview);
     });
 
     test('FSRS card round-trips correctly', () {
@@ -234,9 +206,7 @@ void main() {
         conceptId: 'c1',
         question: 'Q?',
         answer: 'A.',
-        easeFactor: 2.5,
         interval: 3,
-        repetitions: 1,
         nextReview: now,
         lastReview: now.subtract(const Duration(days: 3)),
         difficulty: 5.0,

@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:engram/src/engine/fsrs_engine.dart';
 import 'package:engram/src/engine/graph_analyzer.dart';
-import 'package:engram/src/engine/review_rating.dart';
 import 'package:engram/src/engine/scheduler.dart';
 import 'package:engram/src/models/concept.dart';
 import 'package:engram/src/models/document_metadata.dart';
@@ -41,9 +41,12 @@ final _docUpdatedAt =
 
 /// Builds a graph modeling: Docker (foundational) → Kubernetes (depends on Docker)
 /// → Helm (depends on Kubernetes). This creates a 3-tier dependency chain.
+///
+/// When [dockerMastered] is true, Docker's quiz item has FSRS state=2 (review),
+/// meaning it's considered mastered and will unlock Kubernetes.
 KnowledgeGraph buildDependencyGraph({
-  int dockerReps = 0,
-  int kubernetesReps = 0,
+  bool dockerMastered = false,
+  bool kubernetesMastered = false,
 }) {
   return KnowledgeGraph(
     concepts: [
@@ -86,33 +89,39 @@ KnowledgeGraph buildDependencyGraph({
         conceptId: 'docker',
         question: 'What is Docker?',
         answer: 'A container runtime.',
-        easeFactor: 2.5,
         interval: 0,
-        repetitions: dockerReps,
         nextReview: _pastReview,
-        lastReview: null,
+        lastReview: dockerMastered ? _pastReview : null,
+        difficulty: 5.0,
+        stability: 3.26,
+        fsrsState: dockerMastered ? 2 : 1,
+        lapses: 0,
       ),
       QuizItem(
         id: 'q-kubernetes',
         conceptId: 'kubernetes',
         question: 'What is Kubernetes?',
         answer: 'Container orchestration platform.',
-        easeFactor: 2.5,
         interval: 0,
-        repetitions: kubernetesReps,
         nextReview: _pastReview,
-        lastReview: null,
+        lastReview: kubernetesMastered ? _pastReview : null,
+        difficulty: 5.0,
+        stability: 3.26,
+        fsrsState: kubernetesMastered ? 2 : 1,
+        lapses: 0,
       ),
       QuizItem(
         id: 'q-helm',
         conceptId: 'helm',
         question: 'What is Helm?',
         answer: 'Kubernetes package manager.',
-        easeFactor: 2.5,
         interval: 0,
-        repetitions: 0,
         nextReview: _pastReview,
         lastReview: null,
+        difficulty: 5.0,
+        stability: 3.26,
+        fsrsState: 1,
+        lapses: 0,
       ),
     ],
     documentMetadata: [
@@ -205,8 +214,8 @@ void main() {
     );
 
     test('mastering a concept unlocks its dependents', () async {
-      // Docker already mastered (reps=1), so Kubernetes should unlock
-      final graph = buildDependencyGraph(dockerReps: 1);
+      // Docker already mastered (fsrsState=2), so Kubernetes should unlock
+      final graph = buildDependencyGraph(dockerMastered: true);
       final container = createContainer(graph);
       await container.read(knowledgeGraphProvider.future);
 
@@ -226,7 +235,7 @@ void main() {
       expect(due.any((q) => q.conceptId == 'helm'), isFalse);
     });
 
-    test('quiz session updates SM-2 state and persists to graph', () async {
+    test('quiz session updates FSRS state and persists to graph', () async {
       final graph = buildDependencyGraph();
       final container = createContainer(graph);
       await container.read(knowledgeGraphProvider.future);
@@ -240,21 +249,21 @@ void main() {
       expect(session.items, hasLength(1));
       expect(session.items.first.conceptId, 'docker');
 
-      // Complete the review: reveal → rate 5 (perfect recall)
+      // Complete the review: reveal → rate easy
       notifier.revealAnswer();
-      await notifier.rateItem(const Sm2Rating(5));
+      await notifier.rateItem(FsrsRating.easy);
 
       session = container.read(quizSessionProvider);
       expect(session.phase, QuizPhase.summary);
       expect(session.correctCount, 1);
 
-      // Verify the SM-2 update persisted
+      // Verify the FSRS update persisted
       final updatedGraph = await container.read(knowledgeGraphProvider.future);
       final dockerItem = updatedGraph.quizItems.firstWhere(
         (q) => q.conceptId == 'docker',
       );
-      expect(dockerItem.repetitions, 1);
-      expect(dockerItem.interval, greaterThan(0));
+      expect(dockerItem.lastReview, isNotNull);
+      expect(dockerItem.stability, isNotNull);
     });
 
     test('dashboard stats recompute after quiz completes', () async {
@@ -263,13 +272,13 @@ void main() {
       await container.read(knowledgeGraphProvider.future);
 
       final statsBefore = container.read(dashboardStatsProvider);
-      expect(statsBefore.newCount, 3); // all items have reps=0
+      expect(statsBefore.newCount, 3); // all items have no lastReview
 
-      // Review Docker with perfect score
+      // Review Docker with easy rating
       final notifier = container.read(quizSessionProvider.notifier);
       notifier.startSession();
       notifier.revealAnswer();
-      await notifier.rateItem(const Sm2Rating(5));
+      await notifier.rateItem(FsrsRating.easy);
 
       final statsAfter = container.read(dashboardStatsProvider);
       expect(statsAfter.newCount, 2); // Docker moved out of "new"
@@ -279,7 +288,7 @@ void main() {
     test('"unlocking next" identifies concepts close to unlocking', () async {
       // Docker mastered → Kubernetes unlocked but not mastered
       // Helm depends on Kubernetes (1 unmastered prereq) → "close to unlocking"
-      final graph = buildDependencyGraph(dockerReps: 1);
+      final graph = buildDependencyGraph(dockerMastered: true);
 
       final analyzer = GraphAnalyzer(graph);
 
@@ -292,7 +301,7 @@ void main() {
 
       // Count unmastered prereqs for Helm
       final unmasteredPrereqs =
-          helmPrereqs.where((p) => !analyzer.isConceptMastered(p)).toList();
+          helmPrereqs.where((p) => !analyzer.isConceptGraduated(p)).toList();
       expect(unmasteredPrereqs, hasLength(1)); // Only Kubernetes
       // This means Helm would appear in "Almost unlocking" on the session summary
     });
@@ -312,7 +321,7 @@ void main() {
       final notifier = container.read(quizSessionProvider.notifier);
       notifier.startSession();
       notifier.revealAnswer();
-      await notifier.rateItem(const Sm2Rating(5));
+      await notifier.rateItem(FsrsRating.easy);
       notifier.reset();
 
       // Phase 2: Now Kubernetes should also be available
@@ -331,7 +340,7 @@ void main() {
       // Rate all items in this session
       for (var i = 0; i < session.items.length; i++) {
         notifier.revealAnswer();
-        await notifier.rateItem(const Sm2Rating(5));
+        await notifier.rateItem(FsrsRating.easy);
       }
       notifier.reset();
 

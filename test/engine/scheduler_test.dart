@@ -6,22 +6,27 @@ import 'package:engram/src/models/quiz_item.dart';
 import 'package:engram/src/models/relationship.dart';
 import 'package:test/test.dart';
 
+/// Creates a test quiz item with FSRS state.
+///
+/// [fsrsState] >= 2 means mastered (unlocks dependents).
 QuizItem _makeItem(
   String id, {
   required DateTime nextReview,
   String conceptId = 'c1',
-  int repetitions = 1,
+  int fsrsState = 2,
 }) {
   return QuizItem(
     id: id,
     conceptId: conceptId,
     question: 'Q?',
     answer: 'A.',
-    easeFactor: 2.5,
     interval: 1,
-    repetitions: repetitions,
     nextReview: nextReview,
     lastReview: null,
+    difficulty: 5.0,
+    stability: 3.26,
+    fsrsState: fsrsState,
+    lapses: 0,
   );
 }
 
@@ -123,13 +128,13 @@ void main() {
             'q1',
             conceptId: 'a',
             nextReview: DateTime.utc(2025, 6, 14),
-            repetitions: 0,
+            fsrsState: 1,
           ),
           _makeItem(
             'q2',
             conceptId: 'b',
             nextReview: DateTime.utc(2025, 6, 14),
-            repetitions: 0,
+            fsrsState: 1,
           ),
         ],
       );
@@ -149,13 +154,12 @@ void main() {
             'q1',
             conceptId: 'a',
             nextReview: DateTime.utc(2025, 6, 14),
-            repetitions: 1,
           ),
           _makeItem(
             'q2',
             conceptId: 'b',
             nextReview: DateTime.utc(2025, 6, 14),
-            repetitions: 0,
+            fsrsState: 1,
           ),
         ],
       );
@@ -176,13 +180,12 @@ void main() {
             'q-b',
             conceptId: 'b',
             nextReview: DateTime.utc(2025, 6, 10),
-            repetitions: 0,
+            fsrsState: 1,
           ),
           _makeItem(
             'q-a',
             conceptId: 'a',
             nextReview: DateTime.utc(2025, 6, 14),
-            repetitions: 1,
           ),
         ],
       );
@@ -239,13 +242,13 @@ void main() {
             'q1',
             conceptId: 'a',
             nextReview: DateTime.utc(2025, 6, 14),
-            repetitions: 0,
+            fsrsState: 1,
           ),
           _makeItem(
             'q2',
             conceptId: 'b',
             nextReview: DateTime.utc(2025, 6, 14),
-            repetitions: 0,
+            fsrsState: 1,
           ),
         ],
       );
@@ -390,13 +393,13 @@ void main() {
             'q1',
             conceptId: 'a',
             nextReview: DateTime.utc(2025, 6, 14),
-            repetitions: 0,
+            fsrsState: 1,
           ),
           _makeItem(
             'q2',
             conceptId: 'b',
             nextReview: DateTime.utc(2025, 6, 14),
-            repetitions: 0,
+            fsrsState: 1,
           ),
         ],
         documentMetadata: [

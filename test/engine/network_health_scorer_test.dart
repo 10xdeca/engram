@@ -32,22 +32,26 @@ void main() {
             conceptId: 'a',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
             interval: 25,
-            repetitions: 5,
             nextReview: DateTime.utc(2099),
             lastReview: recentReview,
+            difficulty: 5.0,
+            stability: 30.0,
+            fsrsState: 2,
+            lapses: 0,
           ),
           QuizItem(
             id: 'q2',
             conceptId: 'b',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
             interval: 25,
-            repetitions: 5,
             nextReview: DateTime.utc(2099),
             lastReview: recentReview,
+            difficulty: 5.0,
+            stability: 30.0,
+            fsrsState: 2,
+            lapses: 0,
           ),
         ],
       );
@@ -74,9 +78,7 @@ void main() {
             conceptId: 'a',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
             interval: 0,
-            repetitions: 0,
             nextReview: DateTime.utc(2020),
             lastReview: null,
           ),
@@ -85,9 +87,7 @@ void main() {
             conceptId: 'b',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
             interval: 0,
-            repetitions: 0,
             nextReview: DateTime.utc(2020),
             lastReview: null,
           ),
@@ -111,53 +111,61 @@ void main() {
           Concept(id: 'd', name: 'D', description: '', sourceDocumentId: 'd'),
         ],
         quizItems: [
-          // a: mastered
+          // a: mastered (high stability, recent review → R >= 0.85)
           QuizItem(
             id: 'q1',
             conceptId: 'a',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
             interval: 25,
-            repetitions: 5,
             nextReview: DateTime.utc(2099),
             lastReview: recentReview,
+            difficulty: 5.0,
+            stability: 30.0,
+            fsrsState: 2,
+            lapses: 0,
           ),
-          // b: learning
+          // b: learning (stability 5, reviewed 3 days ago → R between 0.5-0.85)
           QuizItem(
             id: 'q2',
             conceptId: 'b',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
             interval: 6,
-            repetitions: 2,
             nextReview: DateTime.utc(2099),
-            lastReview: recentReview,
+            lastReview: DateTime.utc(2025, 6, 12),
+            difficulty: 5.0,
+            stability: 5.0,
+            fsrsState: 2,
+            lapses: 0,
           ),
-          // c: due
+          // c: due (no lastReview → unreviewed)
           QuizItem(
             id: 'q3',
             conceptId: 'c',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
             interval: 0,
-            repetitions: 0,
             nextReview: DateTime.utc(2020),
             lastReview: null,
+            difficulty: 5.0,
+            stability: 3.26,
+            fsrsState: 1,
+            lapses: 0,
           ),
-          // d: fading
+          // d: fading (mastered but old review > 30 days)
           QuizItem(
             id: 'q4',
             conceptId: 'd',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
             interval: 25,
-            repetitions: 5,
             nextReview: DateTime.utc(2099),
             lastReview: oldReview,
+            difficulty: 5.0,
+            stability: 30.0,
+            fsrsState: 2,
+            lapses: 0,
           ),
         ],
       );
@@ -215,9 +223,7 @@ void main() {
             conceptId: 'hub',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
             interval: 0,
-            repetitions: 0,
             nextReview: DateTime.utc(2020),
             lastReview: null,
           ),
@@ -227,9 +233,7 @@ void main() {
             conceptId: 'dep1',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
             interval: 0,
-            repetitions: 0,
             nextReview: DateTime.utc(2020),
             lastReview: null,
           ),
@@ -238,9 +242,7 @@ void main() {
             conceptId: 'dep2',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
             interval: 0,
-            repetitions: 0,
             nextReview: DateTime.utc(2020),
             lastReview: null,
           ),
@@ -287,9 +289,7 @@ void main() {
             conceptId: 'a',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
             interval: 25,
-            repetitions: 5,
             nextReview: DateTime.utc(2099),
             lastReview: recentReview,
           ),
@@ -298,9 +298,7 @@ void main() {
             conceptId: 'b',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
             interval: 25,
-            repetitions: 5,
             nextReview: DateTime.utc(2099),
             lastReview: recentReview,
           ),
@@ -310,50 +308,6 @@ void main() {
       final health = NetworkHealthScorer(graph, now: now).score();
 
       expect(health.clusterHealth, isNotEmpty);
-    });
-
-    test('decayMultiplier lowers scores via faster freshness decay', () {
-      final graph = KnowledgeGraph(
-        concepts: [
-          Concept(id: 'a', name: 'A', description: '', sourceDocumentId: 'd'),
-          Concept(id: 'b', name: 'B', description: '', sourceDocumentId: 'd'),
-        ],
-        quizItems: [
-          QuizItem(
-            id: 'q1',
-            conceptId: 'a',
-            question: 'Q?',
-            answer: 'A.',
-            easeFactor: 2.5,
-            interval: 25,
-            repetitions: 5,
-            nextReview: DateTime.utc(2099),
-            lastReview: recentReview,
-          ),
-          QuizItem(
-            id: 'q2',
-            conceptId: 'b',
-            question: 'Q?',
-            answer: 'A.',
-            easeFactor: 2.5,
-            interval: 25,
-            repetitions: 5,
-            nextReview: DateTime.utc(2099),
-            lastReview: recentReview,
-          ),
-        ],
-      );
-
-      final normalHealth = NetworkHealthScorer(graph, now: now).score();
-      final stormHealth =
-          NetworkHealthScorer(graph, now: now, decayMultiplier: 2.0).score();
-
-      // Storm should produce a lower score due to reduced freshness
-      expect(stormHealth.score, lessThanOrEqualTo(normalHealth.score));
-      expect(
-        stormHealth.avgFreshness,
-        lessThanOrEqualTo(normalHealth.avgFreshness),
-      );
     });
 
     test('NetworkHealth JSON round-trip', () {

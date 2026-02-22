@@ -1,3 +1,4 @@
+import 'package:engram/src/engine/fsrs_engine.dart';
 import 'package:engram/src/engine/graph_analyzer.dart';
 import 'package:engram/src/engine/mastery_state.dart';
 import 'package:engram/src/models/concept.dart';
@@ -39,9 +40,7 @@ void main() {
             conceptId: 'prereq',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
             interval: 0,
-            repetitions: 0,
             nextReview: DateTime.utc(2020),
             lastReview: null,
           ),
@@ -68,9 +67,7 @@ void main() {
             conceptId: 'c1',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
             interval: 0,
-            repetitions: 0,
             nextReview: DateTime.utc(2020),
             lastReview: null,
           ),
@@ -81,7 +78,10 @@ void main() {
       expect(masteryStateOf('c1', graph, analyzer), MasteryState.due);
     });
 
-    test('learning when reviewed but interval < 21', () {
+    test('learning when FSRS retrievability between 0.5 and 0.85', () {
+      // Stability = 5 days, last review 10 days ago → R between 0.5 and 0.85
+      final now = DateTime.utc(2025, 6, 15);
+      final lastReview = DateTime.utc(2025, 6, 5); // 10 days ago
       final graph = KnowledgeGraph(
         concepts: [
           Concept(
@@ -97,22 +97,38 @@ void main() {
             conceptId: 'c1',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
-            interval: 6,
-            repetitions: 2,
-            nextReview: DateTime.utc(2099),
-            lastReview: null,
+            interval: 5,
+            nextReview: DateTime.utc(2025, 6, 10),
+            lastReview: lastReview,
+            difficulty: 5.0,
+            stability: 5.0,
+            fsrsState: 2,
+            lapses: 0,
           ),
         ],
       );
       final analyzer = GraphAnalyzer(graph);
 
-      expect(masteryStateOf('c1', graph, analyzer), MasteryState.learning);
+      // Verify the retrievability is actually in the learning range.
+      final r = fsrsRetrievability(
+        stability: 5.0,
+        fsrsState: 2,
+        lastReview: lastReview,
+        now: now,
+      );
+      expect(r, greaterThanOrEqualTo(fsrsDueThreshold));
+      expect(r, lessThan(fsrsMasteredThreshold));
+
+      expect(
+        masteryStateOf('c1', graph, analyzer, now: now),
+        MasteryState.learning,
+      );
     });
 
-    test('mastered when interval >= 21 and recently reviewed', () {
+    test('mastered when FSRS retrievability >= 0.85 and recently reviewed', () {
+      // Stability = 100 days, last review 5 days ago → R close to 1.0
       final now = DateTime.utc(2025, 6, 15);
-      final recentReview = DateTime.utc(2025, 6, 10);
+      final recentReview = DateTime.utc(2025, 6, 10); // 5 days ago
       final graph = KnowledgeGraph(
         concepts: [
           Concept(
@@ -128,15 +144,26 @@ void main() {
             conceptId: 'c1',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
-            interval: 25,
-            repetitions: 5,
-            nextReview: DateTime.utc(2099),
+            interval: 100,
+            nextReview: DateTime.utc(2025, 9, 23),
             lastReview: recentReview,
+            difficulty: 5.0,
+            stability: 100.0,
+            fsrsState: 2,
+            lapses: 0,
           ),
         ],
       );
       final analyzer = GraphAnalyzer(graph);
+
+      // Verify retrievability is in the mastered range.
+      final r = fsrsRetrievability(
+        stability: 100.0,
+        fsrsState: 2,
+        lastReview: recentReview,
+        now: now,
+      );
+      expect(r, greaterThanOrEqualTo(fsrsMasteredThreshold));
 
       expect(
         masteryStateOf('c1', graph, analyzer, now: now),
@@ -144,7 +171,9 @@ void main() {
       );
     });
 
-    test('mastered when interval >= 21 and no lastReview', () {
+    test('due when FSRS card has no lastReview (even with high interval)', () {
+      // With FSRS-only scheduling, cards without lastReview are always due
+      // regardless of interval or repetitions.
       final graph = KnowledgeGraph(
         concepts: [
           Concept(
@@ -160,20 +189,24 @@ void main() {
             conceptId: 'c1',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
             interval: 25,
-            repetitions: 5,
             nextReview: DateTime.utc(2099),
             lastReview: null,
+            difficulty: 5.0,
+            stability: 50.0,
+            fsrsState: 2,
+            lapses: 0,
           ),
         ],
       );
       final analyzer = GraphAnalyzer(graph);
 
-      expect(masteryStateOf('c1', graph, analyzer), MasteryState.mastered);
+      expect(masteryStateOf('c1', graph, analyzer), MasteryState.due);
     });
 
-    test('fading when mastered but lastReview > 30 days ago', () {
+    test('fading when FSRS mastered but lastReview > 30 days ago', () {
+      // Stability = 1000 days (very stable), last review 45 days ago → R still
+      // high enough for mastered, but fading threshold triggers.
       final now = DateTime.utc(2025, 6, 15);
       final oldReview = DateTime.utc(2025, 5, 1); // 45 days ago
       final graph = KnowledgeGraph(
@@ -191,15 +224,26 @@ void main() {
             conceptId: 'c1',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
-            interval: 25,
-            repetitions: 5,
-            nextReview: DateTime.utc(2099),
+            interval: 1000,
+            nextReview: DateTime.utc(2028),
             lastReview: oldReview,
+            difficulty: 3.0,
+            stability: 1000.0,
+            fsrsState: 2,
+            lapses: 0,
           ),
         ],
       );
       final analyzer = GraphAnalyzer(graph);
+
+      // Verify R is still mastered-level despite 45 days elapsed.
+      final r = fsrsRetrievability(
+        stability: 1000.0,
+        fsrsState: 2,
+        lastReview: oldReview,
+        now: now,
+      );
+      expect(r, greaterThanOrEqualTo(fsrsMasteredThreshold));
 
       expect(
         masteryStateOf('c1', graph, analyzer, now: now),
@@ -241,9 +285,7 @@ void main() {
             conceptId: 'c1',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
             interval: 0,
-            repetitions: 0,
             nextReview: DateTime.utc(2020),
             lastReview: null,
             difficulty: 5.0,
@@ -276,9 +318,7 @@ void main() {
             conceptId: 'c1',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
             interval: 1,
-            repetitions: 1,
             nextReview: DateTime.utc(2025, 3, 8),
             lastReview: DateTime.utc(2025, 3, 7), // 100 days ago
             difficulty: 8.0,
@@ -314,9 +354,7 @@ void main() {
             conceptId: 'c1',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
             interval: 100,
-            repetitions: 5,
             nextReview: DateTime.utc(2025, 9, 23),
             lastReview: now,
             difficulty: 5.0,
@@ -352,9 +390,7 @@ void main() {
             conceptId: 'c1',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
             interval: 5,
-            repetitions: 3,
             nextReview: DateTime.utc(2025, 6, 10),
             lastReview: DateTime.utc(2025, 6, 5), // 10 days ago
             difficulty: 5.0,
@@ -391,9 +427,7 @@ void main() {
             conceptId: 'c1',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
             interval: 1000,
-            repetitions: 10,
             nextReview: DateTime.utc(2028),
             lastReview: DateTime.utc(2025, 5, 1), // 45 days ago
             difficulty: 3.0,
@@ -430,11 +464,13 @@ void main() {
             conceptId: 'c1',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
             interval: 25,
-            repetitions: 5,
             nextReview: DateTime.utc(2099),
             lastReview: now,
+            difficulty: 5.0,
+            stability: 25.0,
+            fsrsState: 2,
+            lapses: 0,
           ),
         ],
       );
@@ -442,9 +478,11 @@ void main() {
       expect(freshnessOf('c1', graph, now: now), closeTo(1.0, 0.01));
     });
 
-    test('returns ~0.65 for 30 days ago', () {
+    test('returns FSRS retrievability for 30 days ago', () {
       final now = DateTime.utc(2025, 6, 15);
       final thirtyDaysAgo = DateTime.utc(2025, 5, 16);
+      const stability = 25.0;
+      const fsrsState = 2;
       final graph = KnowledgeGraph(
         concepts: [
           Concept(
@@ -460,21 +498,33 @@ void main() {
             conceptId: 'c1',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
             interval: 25,
-            repetitions: 5,
             nextReview: DateTime.utc(2099),
             lastReview: thirtyDaysAgo,
+            difficulty: 5.0,
+            stability: stability,
+            fsrsState: fsrsState,
+            lapses: 0,
           ),
         ],
       );
 
-      expect(freshnessOf('c1', graph, now: now), closeTo(0.65, 0.02));
+      final expectedR = fsrsRetrievability(
+        stability: stability,
+        fsrsState: fsrsState,
+        lastReview: thirtyDaysAgo,
+        now: now,
+      );
+
+      expect(freshnessOf('c1', graph, now: now), closeTo(expectedR, 0.001));
     });
 
-    test('returns 0.3 for 60+ days ago', () {
+    test('returns FSRS retrievability for 60+ days ago', () {
       final now = DateTime.utc(2025, 6, 15);
       final sixtyDaysAgo = DateTime.utc(2025, 4, 16);
+      // Use very low stability so 60 elapsed days produces significant decay.
+      const stability = 1.0;
+      const fsrsState = 2;
       final graph = KnowledgeGraph(
         concepts: [
           Concept(
@@ -490,16 +540,28 @@ void main() {
             conceptId: 'c1',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
-            interval: 25,
-            repetitions: 5,
-            nextReview: DateTime.utc(2099),
+            interval: 1,
+            nextReview: DateTime.utc(2025, 4, 17),
             lastReview: sixtyDaysAgo,
+            difficulty: 5.0,
+            stability: stability,
+            fsrsState: fsrsState,
+            lapses: 0,
           ),
         ],
       );
 
-      expect(freshnessOf('c1', graph, now: now), closeTo(0.3, 0.02));
+      final expectedR = fsrsRetrievability(
+        stability: stability,
+        fsrsState: fsrsState,
+        lastReview: sixtyDaysAgo,
+        now: now,
+      );
+
+      // With FSRS, freshness equals retrievability — 60 days with S=1 gives
+      // significant decay, well below the 30-days-ago higher-stability case.
+      expect(freshnessOf('c1', graph, now: now), closeTo(expectedR, 0.001));
+      expect(expectedR, lessThan(0.5)); // 60 days with S=1 → heavy decay
     });
 
     test('returns 1.0 when no lastReview', () {
@@ -518,9 +580,7 @@ void main() {
             conceptId: 'c1',
             question: 'Q?',
             answer: 'A.',
-            easeFactor: 2.5,
             interval: 0,
-            repetitions: 0,
             nextReview: DateTime.utc(2020),
             lastReview: null,
           ),
@@ -530,75 +590,6 @@ void main() {
       expect(freshnessOf('c1', graph), 1.0);
     });
 
-    test('decayMultiplier 2.0 doubles effective decay', () {
-      final now = DateTime.utc(2025, 6, 15);
-      // 30 days ago: normal freshness ~0.65, with 2x should be ~0.30
-      final thirtyDaysAgo = DateTime.utc(2025, 5, 16);
-      final graph = KnowledgeGraph(
-        concepts: [
-          Concept(
-            id: 'c1',
-            name: 'C',
-            description: 'D',
-            sourceDocumentId: 'doc1',
-          ),
-        ],
-        quizItems: [
-          QuizItem(
-            id: 'q1',
-            conceptId: 'c1',
-            question: 'Q?',
-            answer: 'A.',
-            easeFactor: 2.5,
-            interval: 25,
-            repetitions: 5,
-            nextReview: DateTime.utc(2099),
-            lastReview: thirtyDaysAgo,
-          ),
-        ],
-      );
-
-      final normal = freshnessOf('c1', graph, now: now);
-      final doubled = freshnessOf('c1', graph, now: now, decayMultiplier: 2.0);
-
-      expect(normal, closeTo(0.65, 0.02));
-      // 30 days * 2.0 = 60 effective days → hits the floor of 0.3
-      expect(doubled, closeTo(0.3, 0.02));
-      expect(doubled, lessThan(normal));
-    });
-
-    test('decayMultiplier 1.0 is default behavior', () {
-      final now = DateTime.utc(2025, 6, 15);
-      final review = DateTime.utc(2025, 5, 16);
-      final graph = KnowledgeGraph(
-        concepts: [
-          Concept(
-            id: 'c1',
-            name: 'C',
-            description: 'D',
-            sourceDocumentId: 'doc1',
-          ),
-        ],
-        quizItems: [
-          QuizItem(
-            id: 'q1',
-            conceptId: 'c1',
-            question: 'Q?',
-            answer: 'A.',
-            easeFactor: 2.5,
-            interval: 25,
-            repetitions: 5,
-            nextReview: DateTime.utc(2099),
-            lastReview: review,
-          ),
-        ],
-      );
-
-      final defaultVal = freshnessOf('c1', graph, now: now);
-      final explicit = freshnessOf('c1', graph, now: now, decayMultiplier: 1.0);
-
-      expect(defaultVal, explicit);
-    });
   });
 
   test('masteryColors has all five states', () {
