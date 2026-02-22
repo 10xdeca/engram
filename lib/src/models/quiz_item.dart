@@ -4,6 +4,11 @@ import '../engine/fsrs_engine.dart';
 
 /// Days of FSRS stability required to consider a card mastered enough to
 /// unlock dependent concepts.
+///
+/// 21 days aligns with FSRS research showing that stability ≥ 3 weeks
+/// indicates durable long-term memory (roughly 3 successful review cycles).
+/// This threshold balances two tensions: too low and dependents unlock before
+/// prerequisite knowledge is solid; too high and graph progression stalls.
 const masteryUnlockDays = 21;
 
 @immutable
@@ -137,6 +142,8 @@ class QuizItem {
   /// Whether this card is mastered enough to unlock dependent concepts.
   ///
   /// Uses FSRS stability >= [masteryUnlockDays] (memory strength).
+  /// The null guard is defensive — after Phase 3 migration all cards have
+  /// stability, but pre-migration JSON in Firestore could still lack it.
   bool get isMasteredForUnlock => stability != null && stability! >= masteryUnlockDays;
 
   QuizItem withFsrsReview({
