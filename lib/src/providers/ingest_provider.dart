@@ -9,6 +9,7 @@ import '../models/ingest_document.dart';
 import '../models/ingest_state.dart';
 import '../models/topic.dart';
 import 'clock_provider.dart';
+import 'difficulty_evaluation_provider.dart';
 import 'graph_store_provider.dart';
 import 'knowledge_graph_provider.dart';
 import 'service_providers.dart';
@@ -222,6 +223,7 @@ class IngestNotifier extends Notifier<IngestState> {
     try {
       final client = ref.read(outlineClientProvider);
       final extraction = ref.read(extractionServiceProvider);
+      final predictionAccuracy = ref.read(difficultyEvaluationProvider);
 
       // Build the list of documents to process from the selected IDs
       final docsToProcess =
@@ -307,7 +309,7 @@ class IngestNotifier extends Notifier<IngestState> {
 
         // Extract knowledge via Claude API — pass ALL existing concept IDs
         // (full graph, not just topic) so Claude can create cross-document
-        // relationships.
+        // relationships. Include prediction accuracy for calibration feedback.
         state = state.copyWith(
           statusMessage: 'Extracting knowledge (${content.length} chars)...',
         );
@@ -321,6 +323,7 @@ class IngestNotifier extends Notifier<IngestState> {
               documentTitle: docTitle,
               documentContent: content,
               existingConceptIds: graph.concepts.map((c) => c.id).toList(),
+              predictionAccuracy: predictionAccuracy,
             )
             .timeout(
               const Duration(minutes: 3),
@@ -436,6 +439,7 @@ class IngestNotifier extends Notifier<IngestState> {
       final client = ref.read(outlineClientProvider);
       final extraction = ref.read(extractionServiceProvider);
       final graphNotifier = ref.read(knowledgeGraphProvider.notifier);
+      final predictionAccuracy = ref.read(difficultyEvaluationProvider);
 
       final collectionId = collection['id'] as String;
       final collectionName = collection['name'] as String?;
@@ -523,7 +527,8 @@ class IngestNotifier extends Notifier<IngestState> {
           continue;
         }
 
-        // Extract knowledge via Claude API
+        // Extract knowledge via Claude API — include prediction accuracy
+        // for calibration feedback.
         state = state.copyWith(
           statusMessage: 'Extracting knowledge (${content.length} chars)...',
         );
@@ -537,6 +542,7 @@ class IngestNotifier extends Notifier<IngestState> {
               documentTitle: docTitle,
               documentContent: content,
               existingConceptIds: graph.concepts.map((c) => c.id).toList(),
+              predictionAccuracy: predictionAccuracy,
             )
             .timeout(
               const Duration(minutes: 3),

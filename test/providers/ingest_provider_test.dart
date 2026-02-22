@@ -142,6 +142,7 @@ void main() {
           documentTitle: any(named: 'documentTitle'),
           documentContent: any(named: 'documentContent'),
           existingConceptIds: any(named: 'existingConceptIds'),
+          predictionAccuracy: any(named: 'predictionAccuracy'),
         ),
       ).thenAnswer(
         (_) async => ExtractionResult(
