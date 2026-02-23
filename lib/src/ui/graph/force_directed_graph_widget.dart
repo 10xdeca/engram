@@ -148,14 +148,12 @@ class _ForceDirectedGraphWidgetState extends State<ForceDirectedGraphWidget>
     _catastropheController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 3),
-    )..addListener(_onCatastropheFrame);
+    );
 
     _stormController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 5),
-    )..addListener(() {
-      if (_stormActive) setState(() {});
-    });
+    );
 
     _glowController = AnimationController(
       vsync: this,
@@ -209,11 +207,14 @@ class _ForceDirectedGraphWidgetState extends State<ForceDirectedGraphWidget>
     final tier = widget.healthTier;
     if (tier == HealthTier.healthy) {
       _catastropheActive = false;
+      _catastropheController.removeListener(_onCatastropheFrame);
       _catastropheController.stop();
       _catastropheController.reset();
     } else {
       _catastropheActive = true;
       _particleSystem.initialize(_edges, tier);
+      _catastropheController.removeListener(_onCatastropheFrame);
+      _catastropheController.addListener(_onCatastropheFrame);
       _catastropheController.repeat();
     }
   }
@@ -221,9 +222,12 @@ class _ForceDirectedGraphWidgetState extends State<ForceDirectedGraphWidget>
   void _initStormEffects() {
     if (widget.isStormActive) {
       _stormActive = true;
+      _stormController.removeListener(_onStormFrame);
+      _stormController.addListener(_onStormFrame);
       _stormController.repeat();
     } else {
       _stormActive = false;
+      _stormController.removeListener(_onStormFrame);
       _stormController.stop();
       _stormController.reset();
     }
@@ -248,6 +252,11 @@ class _ForceDirectedGraphWidgetState extends State<ForceDirectedGraphWidget>
   void _onCatastropheFrame() {
     if (!_catastropheActive) return;
     _particleSystem.step(widget.healthTier);
+    setState(() {});
+  }
+
+  void _onStormFrame() {
+    if (!_stormActive) return;
     setState(() {});
   }
 
@@ -378,8 +387,9 @@ class _ForceDirectedGraphWidgetState extends State<ForceDirectedGraphWidget>
   void _onTick(Duration _) {
     final stillMoving = _layout.step();
     _syncPositions();
-    setState(() {});
-    if (!stillMoving) {
+    if (stillMoving) {
+      setState(() {});
+    } else {
       _ticker.stop();
     }
     widget.onDebugTick?.call(
