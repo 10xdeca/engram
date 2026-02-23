@@ -177,23 +177,23 @@ class GraphPainter extends CustomPainter {
 
   void _paintEdges(Canvas canvas) {
     for (final edge in edges) {
+      final paint = _paintForType(edge.type);
+      final src = edge.source.position;
+      final tgt = edge.target.position;
+
       // Glow underlay for edges touching a glowing node.
       if (glowIntensity > 0 &&
           (glowNodeIds.contains(edge.source.id) ||
               glowNodeIds.contains(edge.target.id))) {
         final glowPaint = Paint()
           ..color = Colors.cyan.withValues(alpha: 0.6 * glowIntensity)
-          ..strokeWidth =
-              _paintForType(edge.type).strokeWidth + glowEdgeExtraWidth
+          ..strokeWidth = paint.strokeWidth + glowEdgeExtraWidth
           ..style = PaintingStyle.stroke
           ..maskFilter =
               MaskFilter.blur(BlurStyle.normal, glowEdgeBlurSigma);
-        canvas.drawLine(edge.source.position, edge.target.position, glowPaint);
+        canvas.drawLine(src, tgt, glowPaint);
       }
 
-      final paint = _paintForType(edge.type);
-      final src = edge.source.position;
-      final tgt = edge.target.position;
       final isDashed =
           edge.type == RelationshipType.analogy ||
           edge.type == RelationshipType.contrast;

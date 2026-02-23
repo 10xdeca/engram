@@ -230,11 +230,12 @@ class _ForceDirectedGraphWidgetState extends State<ForceDirectedGraphWidget>
   }
 
   void _initGlowEffect() {
+    // Always remove first to prevent duplicate listener accumulation.
+    _glowController.removeListener(_onGlowFrame);
     if (widget.glowNodeIds.isNotEmpty) {
-      _glowController.forward(from: 0.0);
       _glowController.addListener(_onGlowFrame);
+      _glowController.forward(from: 0.0);
     } else {
-      _glowController.removeListener(_onGlowFrame);
       _glowController.stop();
       _glowController.reset();
     }
