@@ -40,25 +40,28 @@ class WidgetLabTab extends StatelessWidget {
         _section('NetworkHealthIndicator'),
         _specimenRow('All 5 tiers', [
           for (final tier in HealthTier.values)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Column(
-                children: [
-                  NetworkHealthIndicator(
-                    health: NetworkHealth(
-                      score: _scoreForTier(tier),
-                      tier: tier,
-                      clusterHealth: const {'A': 0.9, 'B': 0.6},
-                      atRiskCriticalPaths: tier == HealthTier.healthy ? 0 : 3,
-                      totalCriticalPaths: 5,
+            SizedBox(
+              width: 250,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Column(
+                  children: [
+                    NetworkHealthIndicator(
+                      health: NetworkHealth(
+                        score: _scoreForTier(tier),
+                        tier: tier,
+                        clusterHealth: const {'A': 0.9, 'B': 0.6},
+                        atRiskCriticalPaths: tier == HealthTier.healthy ? 0 : 3,
+                        totalCriticalPaths: 5,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    tier.name,
-                    style: const TextStyle(fontSize: 10),
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    Text(
+                      tier.name,
+                      style: const TextStyle(fontSize: 10),
+                    ),
+                  ],
+                ),
               ),
             ),
         ]),
