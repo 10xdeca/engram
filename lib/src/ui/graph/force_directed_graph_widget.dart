@@ -456,9 +456,9 @@ class _ForceDirectedGraphWidgetState extends State<ForceDirectedGraphWidget>
     // Zoom centered on the tapped viewport point.
     final m =
         Matrix4.identity()
-          ..translateByDouble(viewportLocal.dx, viewportLocal.dy, 0, 0)
+          ..translateByDouble(viewportLocal.dx, viewportLocal.dy, 0, 1)
           ..scaleByDouble(zoomFactor, zoomFactor, 1, 1)
-          ..translateByDouble(-viewportLocal.dx, -viewportLocal.dy, 0, 0);
+          ..translateByDouble(-viewportLocal.dx, -viewportLocal.dy, 0, 1);
     _transformController.value = m * _transformController.value;
   }
 

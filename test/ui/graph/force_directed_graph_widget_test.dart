@@ -142,6 +142,70 @@ void main() {
       expect(find.byType(CustomPaint), findsWidgets);
     });
 
+    testWidgets('double-tap zooms the graph (regression)', (tester) async {
+      final graph = KnowledgeGraph(
+        concepts: [
+          Concept(
+            id: 'c1',
+            name: 'Docker',
+            description: 'Containers',
+            sourceDocumentId: 'doc1',
+          ),
+          Concept(
+            id: 'c2',
+            name: 'K8s',
+            description: 'Orchestration',
+            sourceDocumentId: 'doc1',
+          ),
+        ],
+        relationships: [
+          const Relationship(
+            id: 'r1',
+            fromConceptId: 'c2',
+            toConceptId: 'c1',
+            label: 'depends on',
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox.expand(
+              child: ForceDirectedGraphWidget(graph: graph),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Verify initial scale is 1.0
+      final iv = tester.widget<InteractiveViewer>(
+        find.byType(InteractiveViewer),
+      );
+      final controller = iv.transformationController!;
+      expect(controller.value.getMaxScaleOnAxis(), closeTo(1.0, 0.01));
+
+      // Simulate double-tap: two taps in quick succession at the same point.
+      // Uses real wall-clock time, so a 50ms gap is well within the 300ms
+      // threshold in _onTapUp's manual double-tap detection.
+      final center = tester.getCenter(
+        find.byType(ForceDirectedGraphWidget),
+      );
+      await tester.tapAt(center);
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tapAt(center);
+      await tester.pumpAndSettle();
+
+      // After double-tap the graph should be zoomed in (~2x, capped at 3x).
+      final scaleAfter = controller.value.getMaxScaleOnAxis();
+      expect(
+        scaleAfter,
+        greaterThan(1.5),
+        reason: 'Double-tap should zoom the graph to ~2x',
+      );
+    });
+
     testWidgets('handles empty graph', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
