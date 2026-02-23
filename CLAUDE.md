@@ -33,6 +33,12 @@ flutter test
 flutter run -d macos
 ```
 
+## Visual Lab
+```bash
+flutter run -d macos -t lib/main_lab.dart
+```
+Standalone entry point — no Firebase, no auth, no Riverpod. 4-tab layout: Graph (existing `GraphLabScreen`), Overlays (storm/catastrophe), Glow (cyan halo animation), Widgets (scrollable catalog of all visual widget states).
+
 ## Testing
 Tests mirror lib/src/ structure. Use `mocktail` for mocking HTTP clients. Widget tests override providers with `_PreloadedGraphNotifier` to avoid async I/O. Custom `ForceDirectedGraphWidget` settles via temperature annealing, so `pumpAndSettle()` works in all tests. Always handle all analyzer hints — never use `// ignore` comments; fix the root cause instead.
 
