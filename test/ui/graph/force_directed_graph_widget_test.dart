@@ -206,6 +206,54 @@ void main() {
       );
     });
 
+    testWidgets('glow animation settles with pumpAndSettle', (tester) async {
+      final graph = KnowledgeGraph(
+        concepts: [
+          Concept(
+            id: 'c1',
+            name: 'Docker',
+            description: 'Containers',
+            sourceDocumentId: 'doc1',
+          ),
+          Concept(
+            id: 'c2',
+            name: 'K8s',
+            description: 'Orchestration',
+            sourceDocumentId: 'doc1',
+          ),
+        ],
+        relationships: [
+          const Relationship(
+            id: 'r1',
+            fromConceptId: 'c2',
+            toConceptId: 'c1',
+            label: 'depends on',
+          ),
+        ],
+      );
+
+      var glowCompleted = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ForceDirectedGraphWidget(
+              graph: graph,
+              glowNodeIds: const {'c1'},
+              onGlowComplete: () => glowCompleted = true,
+            ),
+          ),
+        ),
+      );
+
+      // The glow animation (4s) is finite duration, so pumpAndSettle will
+      // wait for both the layout ticker and the glow controller to finish.
+      await tester.pumpAndSettle();
+
+      expect(glowCompleted, isTrue);
+      expect(find.byType(CustomPaint), findsWidgets);
+    });
+
     testWidgets('handles empty graph', (tester) async {
       await tester.pumpWidget(
         MaterialApp(

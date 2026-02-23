@@ -175,6 +175,9 @@ void main() {
       expect(result.evaluation!.matchedCount, 1);
       expect(result.evaluation!.accuracy, 1.0);
 
+      // Verify ingested concept IDs are populated for glow animation.
+      expect(result.ingestedConceptIds, contains('ml-db'));
+
       // Verify transitions happened in order.
       expect(
         statuses,
