@@ -23,6 +23,8 @@ class GraphPainter extends CustomPainter {
     this.draggingNodeId,
     this.guardianMap = const {},
     this.currentUserUid,
+    this.glowNodeIds = const {},
+    this.glowIntensity = 0.0,
   });
 
   final List<GraphNode> nodes;
@@ -39,6 +41,12 @@ class GraphPainter extends CustomPainter {
 
   /// Current user's UID, for highlighting their guarded nodes.
   final String? currentUserUid;
+
+  /// Node IDs that should render with a cyan glow halo.
+  final Set<String> glowNodeIds;
+
+  /// Glow intensity from 1.0 (full) to 0.0 (invisible), driven by animation.
+  final double glowIntensity;
 
   // -- Concept node visual constants --
 
@@ -68,6 +76,20 @@ class GraphPainter extends CustomPainter {
 
   /// Maximum width for concept label text layout.
   static const labelMaxWidth = 100.0;
+
+  // -- Glow visual constants --
+
+  /// Radial glow extends to this multiple of node radius for glowing nodes.
+  static const glowHaloRadiusMultiplier = 3.0;
+
+  /// Stroke width of the bright ring around glowing nodes.
+  static const glowRingStrokeWidth = 2.0;
+
+  /// Extra width added to edges touching a glowing node.
+  static const glowEdgeExtraWidth = 3.0;
+
+  /// Blur sigma for the glowing edge stroke.
+  static const glowEdgeBlurSigma = 3.0;
 
   // -- Edge / arrowhead constants --
 
@@ -155,6 +177,20 @@ class GraphPainter extends CustomPainter {
 
   void _paintEdges(Canvas canvas) {
     for (final edge in edges) {
+      // Glow underlay for edges touching a glowing node.
+      if (glowIntensity > 0 &&
+          (glowNodeIds.contains(edge.source.id) ||
+              glowNodeIds.contains(edge.target.id))) {
+        final glowPaint = Paint()
+          ..color = Colors.cyan.withValues(alpha: 0.6 * glowIntensity)
+          ..strokeWidth =
+              _paintForType(edge.type).strokeWidth + glowEdgeExtraWidth
+          ..style = PaintingStyle.stroke
+          ..maskFilter =
+              MaskFilter.blur(BlurStyle.normal, glowEdgeBlurSigma);
+        canvas.drawLine(edge.source.position, edge.target.position, glowPaint);
+      }
+
       final paint = _paintForType(edge.type);
       final src = edge.source.position;
       final tgt = edge.target.position;
@@ -276,6 +312,27 @@ class GraphPainter extends CustomPainter {
           ..color = Colors.white.withValues(alpha: 0.15)
           ..style = PaintingStyle.stroke
           ..strokeWidth = dragGlowStrokeWidth,
+      );
+    }
+
+    // Cyan glow halo for newly ingested nodes
+    if (glowIntensity > 0 && glowNodeIds.contains(node.id)) {
+      final glowRadius = effectiveRadius * glowHaloRadiusMultiplier;
+      final haloPaint = Paint()
+        ..shader = ui.Gradient.radial(node.position, glowRadius, [
+          Colors.cyan.withValues(alpha: 0.5 * glowIntensity),
+          Colors.cyan.withValues(alpha: 0.0),
+        ]);
+      canvas.drawCircle(node.position, glowRadius, haloPaint);
+
+      // Bright cyan ring
+      canvas.drawCircle(
+        node.position,
+        effectiveRadius + 2,
+        Paint()
+          ..color = Colors.cyan.withValues(alpha: 0.8 * glowIntensity)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = glowRingStrokeWidth,
       );
     }
 
@@ -514,6 +571,8 @@ class GraphPainter extends CustomPainter {
         oldDelegate.selectedNodeId != selectedNodeId ||
         oldDelegate.draggingNodeId != draggingNodeId ||
         oldDelegate.guardianMap != guardianMap ||
-        oldDelegate.currentUserUid != currentUserUid;
+        oldDelegate.currentUserUid != currentUserUid ||
+        oldDelegate.glowNodeIds != glowNodeIds ||
+        oldDelegate.glowIntensity != glowIntensity;
   }
 }

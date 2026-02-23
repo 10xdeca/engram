@@ -45,6 +45,8 @@ class ForceDirectedGraphWidget extends StatefulWidget {
     this.isStormActive = false,
     this.relayPulses = const [],
     this.relayConceptIds = const {},
+    this.glowNodeIds = const {},
+    this.onGlowComplete,
     this.onDebugTick,
     this.layoutWidth,
     this.layoutHeight,
@@ -80,6 +82,12 @@ class ForceDirectedGraphWidget extends StatefulWidget {
 
   /// Concept IDs in active relays — highlighted with cyan ring.
   final Set<String> relayConceptIds;
+
+  /// Node IDs that should glow with a cyan halo (newly ingested nodes).
+  final Set<String> glowNodeIds;
+
+  /// Called when the glow animation finishes, so the caller can clear state.
+  final VoidCallback? onGlowComplete;
 
   /// Optional callback fired each animation tick with layout debug info.
   /// Used by GraphLabScreen to display temperature, pinned count, etc.
@@ -128,6 +136,9 @@ class _ForceDirectedGraphWidgetState extends State<ForceDirectedGraphWidget>
   late final AnimationController _stormController;
   bool _stormActive = false;
 
+  // Glow animation system
+  late final AnimationController _glowController;
+
   @override
   void initState() {
     super.initState();
@@ -146,8 +157,18 @@ class _ForceDirectedGraphWidgetState extends State<ForceDirectedGraphWidget>
       if (_stormActive) setState(() {});
     });
 
+    _glowController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+    )..addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        widget.onGlowComplete?.call();
+      }
+    });
+
     _initCatastropheEffects();
     _initStormEffects();
+    _initGlowEffect();
   }
 
   @override
@@ -167,11 +188,15 @@ class _ForceDirectedGraphWidgetState extends State<ForceDirectedGraphWidget>
     if (oldWidget.isStormActive != widget.isStormActive) {
       _initStormEffects();
     }
+    if (oldWidget.glowNodeIds != widget.glowNodeIds) {
+      _initGlowEffect();
+    }
   }
 
   @override
   void dispose() {
     _removeOverlay();
+    _glowController.dispose();
     _stormController.dispose();
     _catastropheController.dispose();
     _ticker.dispose();
@@ -202,6 +227,21 @@ class _ForceDirectedGraphWidgetState extends State<ForceDirectedGraphWidget>
       _stormController.stop();
       _stormController.reset();
     }
+  }
+
+  void _initGlowEffect() {
+    if (widget.glowNodeIds.isNotEmpty) {
+      _glowController.forward(from: 0.0);
+      _glowController.addListener(_onGlowFrame);
+    } else {
+      _glowController.removeListener(_onGlowFrame);
+      _glowController.stop();
+      _glowController.reset();
+    }
+  }
+
+  void _onGlowFrame() {
+    setState(() {});
   }
 
   void _onCatastropheFrame() {
@@ -654,6 +694,11 @@ class _ForceDirectedGraphWidgetState extends State<ForceDirectedGraphWidget>
                     : null,
             guardianMap: widget.guardianMap,
             currentUserUid: widget.currentUserUid,
+            glowNodeIds: widget.glowNodeIds,
+            glowIntensity:
+                widget.glowNodeIds.isNotEmpty
+                    ? 1.0 - _glowController.value
+                    : 0.0,
           ),
           foregroundPainter:
               _catastropheActive

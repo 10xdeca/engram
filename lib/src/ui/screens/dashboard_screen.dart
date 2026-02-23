@@ -12,6 +12,7 @@ import '../../providers/dashboard_stats_provider.dart';
 import '../../providers/difficulty_evaluation_provider.dart';
 import '../../providers/filtered_graph_provider.dart';
 import '../../providers/gap_analysis_provider.dart';
+import '../../providers/glow_node_provider.dart';
 import '../../providers/graph_structure_provider.dart';
 import '../../providers/knowledge_graph_provider.dart';
 import '../../providers/network_health_provider.dart';
@@ -257,6 +258,7 @@ class _DashboardContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final graph = ref.watch(filteredGraphProvider);
     final stats = ref.watch(filteredStatsProvider);
+    final glowNodeIds = ref.watch(glowNodeIdsProvider);
 
     return Stack(
       children: [
@@ -271,6 +273,11 @@ class _DashboardContent extends ConsumerWidget {
                           graph: graph,
                           layoutWidth: constraints.maxWidth,
                           layoutHeight: constraints.maxHeight,
+                          glowNodeIds: glowNodeIds,
+                          onGlowComplete: () {
+                            ref.read(glowNodeIdsProvider.notifier).state =
+                                const {};
+                          },
                         ),
                   )
                   : const Center(child: Text('No concepts to display')),

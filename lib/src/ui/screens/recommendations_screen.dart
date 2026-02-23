@@ -5,7 +5,9 @@ import '../../engine/recommendation_evaluation.dart';
 import '../../models/knowledge_gap.dart';
 import '../../models/recommendation.dart';
 import '../../providers/gap_analysis_provider.dart';
+import '../../providers/glow_node_provider.dart';
 import '../../providers/recommendation_provider.dart';
+import '../navigation_shell.dart';
 
 /// Screen showing knowledge gaps and recommended documents to fill them.
 class RecommendationsScreen extends ConsumerWidget {
@@ -297,10 +299,28 @@ class _IngestAction extends ConsumerWidget {
           ),
         ],
       ),
-      RecommendationIngestStatus.completed => switch (result?.evaluation) {
-        final eval? => _EvaluationBadge(evaluation: eval),
-        null => const SizedBox.shrink(),
-      },
+      RecommendationIngestStatus.completed => Row(
+        children: [
+          if (result?.evaluation case final eval?)
+            Expanded(child: _EvaluationBadge(evaluation: eval)),
+          if (result != null && result!.ingestedConceptIds.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  ref.read(glowNodeIdsProvider.notifier).state =
+                      result!.ingestedConceptIds;
+                  // Pop back to the navigation shell root.
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                  // Navigate to Dashboard tab (index 1).
+                  navigationShellKey.currentState?.navigateToTab(1);
+                },
+                icon: const Icon(Icons.hub, size: 16),
+                label: const Text('View in Graph'),
+              ),
+            ),
+        ],
+      ),
       RecommendationIngestStatus.error => Row(
         children: [
           Expanded(

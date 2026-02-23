@@ -38,21 +38,27 @@ class RecommendationIngestResult {
     this.status = RecommendationIngestStatus.idle,
     this.evaluation,
     this.errorMessage,
+    this.ingestedConceptIds = const {},
   });
 
   final RecommendationIngestStatus status;
   final RecommendationEvaluationResult? evaluation;
   final String? errorMessage;
 
+  /// IDs of concepts added during ingestion, used for glow animation.
+  final Set<String> ingestedConceptIds;
+
   RecommendationIngestResult copyWith({
     RecommendationIngestStatus? status,
     RecommendationEvaluationResult? evaluation,
     String? errorMessage,
+    Set<String>? ingestedConceptIds,
   }) {
     return RecommendationIngestResult(
       status: status ?? this.status,
       evaluation: evaluation ?? this.evaluation,
       errorMessage: errorMessage ?? this.errorMessage,
+      ingestedConceptIds: ingestedConceptIds ?? this.ingestedConceptIds,
     );
   }
 }
@@ -231,6 +237,9 @@ class RecommendationNotifier extends Notifier<RecommendationState> {
         predictionAccuracy: predictionAccuracy,
       );
 
+      // Capture new concept IDs for glow animation.
+      final newConceptIds = extraction.concepts.map((c) => c.id).toSet();
+
       // 5. Merge into graph via non-staggered ingest.
       await ref.read(knowledgeGraphProvider.notifier).ingestExtraction(
         extraction,
@@ -257,11 +266,12 @@ class RecommendationNotifier extends Notifier<RecommendationState> {
         graphAfter: graphAfter,
       );
 
-      // 8. Set status → completed with evaluation.
+      // 8. Set status → completed with evaluation and concept IDs.
       updateIngest(
         RecommendationIngestResult(
           status: RecommendationIngestStatus.completed,
           evaluation: evaluation,
+          ingestedConceptIds: newConceptIds,
         ),
       );
     } on OutlineApiException catch (e) {
