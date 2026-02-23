@@ -14,6 +14,7 @@ import '../../widgets/repair_mission_card.dart';
 import '../../widgets/sign_in_button.dart';
 import '../../widgets/stat_card.dart';
 import '../../widgets/team_goal_card.dart';
+import 'lab_test_data.dart';
 
 /// Scrollable catalog of every visual widget in multiple states.
 ///
@@ -68,8 +69,8 @@ class WidgetLabTab extends StatelessWidget {
           EntropyStormCard(
             storm: EntropyStorm(
               id: 'storm-1',
-              scheduledStart: _now.add(const Duration(hours: 6)),
-              scheduledEnd: _now.add(const Duration(hours: 54)),
+              scheduledStart: labNow.add(const Duration(hours: 6)),
+              scheduledEnd: labNow.add(const Duration(hours: 54)),
               status: StormStatus.scheduled,
               participantUids: const ['alice', 'bob'],
               createdByUid: 'alice',
@@ -82,8 +83,8 @@ class WidgetLabTab extends StatelessWidget {
           EntropyStormCard(
             storm: EntropyStorm(
               id: 'storm-2',
-              scheduledStart: _now.subtract(const Duration(hours: 12)),
-              scheduledEnd: _now.add(const Duration(hours: 36)),
+              scheduledStart: labNow.subtract(const Duration(hours: 12)),
+              scheduledEnd: labNow.add(const Duration(hours: 36)),
               status: StormStatus.active,
               participantUids: const ['alice', 'bob', 'carol'],
               createdByUid: 'alice',
@@ -97,8 +98,8 @@ class WidgetLabTab extends StatelessWidget {
           EntropyStormCard(
             storm: EntropyStorm(
               id: 'storm-3',
-              scheduledStart: _now.subtract(const Duration(hours: 60)),
-              scheduledEnd: _now.subtract(const Duration(hours: 12)),
+              scheduledStart: labNow.subtract(const Duration(hours: 60)),
+              scheduledEnd: labNow.subtract(const Duration(hours: 12)),
               status: StormStatus.survived,
               participantUids: const ['alice', 'bob'],
               createdByUid: 'alice',
@@ -112,8 +113,8 @@ class WidgetLabTab extends StatelessWidget {
           EntropyStormCard(
             storm: EntropyStorm(
               id: 'storm-4',
-              scheduledStart: _now.subtract(const Duration(hours: 60)),
-              scheduledEnd: _now.subtract(const Duration(hours: 12)),
+              scheduledStart: labNow.subtract(const Duration(hours: 60)),
+              scheduledEnd: labNow.subtract(const Duration(hours: 12)),
               status: StormStatus.failed,
               participantUids: const ['alice'],
               createdByUid: 'alice',
@@ -134,8 +135,8 @@ class WidgetLabTab extends StatelessWidget {
               type: GoalType.clusterMastery,
               targetCluster: 'Algorithms',
               targetValue: 10.0,
-              createdAt: _now.subtract(const Duration(days: 5)),
-              deadline: _now.add(const Duration(days: 9)),
+              createdAt: labNow.subtract(const Duration(days: 5)),
+              deadline: labNow.add(const Duration(days: 9)),
               createdByUid: 'alice',
               contributions: const {'alice': 2.0, 'bob': 1.0},
             ),
@@ -150,8 +151,8 @@ class WidgetLabTab extends StatelessWidget {
               description: 'Bring overall network health above 90%',
               type: GoalType.healthTarget,
               targetValue: 0.9,
-              createdAt: _now.subtract(const Duration(days: 3)),
-              deadline: _now.add(const Duration(days: 4)),
+              createdAt: labNow.subtract(const Duration(days: 3)),
+              deadline: labNow.add(const Duration(days: 4)),
               createdByUid: 'bob',
               contributions: const {'alice': 0.3, 'bob': 0.2, 'carol': 0.175},
             ),
@@ -166,8 +167,8 @@ class WidgetLabTab extends StatelessWidget {
               description: 'Every team member reviews daily for a week',
               type: GoalType.streakTarget,
               targetValue: 7.0,
-              createdAt: _now.subtract(const Duration(days: 1)),
-              deadline: _now.add(const Duration(days: 13)),
+              createdAt: labNow.subtract(const Duration(days: 1)),
+              deadline: labNow.add(const Duration(days: 13)),
               createdByUid: 'carol',
               contributions: const {'carol': 1.0},
             ),
@@ -187,15 +188,15 @@ class WidgetLabTab extends StatelessWidget {
                   conceptName: 'Spaced Repetition',
                   claimedByUid: 'alice',
                   claimedByName: 'Alice',
-                  claimedAt: _now.subtract(const Duration(hours: 20)),
-                  completedAt: _now.subtract(const Duration(hours: 18)),
+                  claimedAt: labNow.subtract(const Duration(hours: 20)),
+                  completedAt: labNow.subtract(const Duration(hours: 18)),
                 ),
                 RelayLeg(
                   conceptId: 'b',
                   conceptName: 'Leitner System',
                   claimedByUid: 'bob',
                   claimedByName: 'Bob',
-                  claimedAt: _now.subtract(const Duration(hours: 5)),
+                  claimedAt: labNow.subtract(const Duration(hours: 5)),
                 ),
                 const RelayLeg(
                   conceptId: 'c',
@@ -206,7 +207,7 @@ class WidgetLabTab extends StatelessWidget {
                   conceptName: 'FSRS Algorithm',
                 ),
               ],
-              createdAt: _now.subtract(const Duration(days: 2)),
+              createdAt: labNow.subtract(const Duration(days: 2)),
               createdByUid: 'alice',
             ),
             currentUid: 'carol',
@@ -224,21 +225,21 @@ class WidgetLabTab extends StatelessWidget {
                   conceptName: 'Forgetting Curve',
                   claimedByUid: 'alice',
                   claimedByName: 'Alice',
-                  claimedAt: _now.subtract(const Duration(hours: 48)),
-                  completedAt: _now.subtract(const Duration(hours: 46)),
+                  claimedAt: labNow.subtract(const Duration(hours: 48)),
+                  completedAt: labNow.subtract(const Duration(hours: 46)),
                 ),
                 RelayLeg(
                   conceptId: 'f',
                   conceptName: 'Memory Palace',
                   claimedByUid: 'bob',
                   claimedByName: 'Bob',
-                  claimedAt: _now.subtract(const Duration(hours: 24)),
-                  completedAt: _now.subtract(const Duration(hours: 22)),
+                  claimedAt: labNow.subtract(const Duration(hours: 24)),
+                  completedAt: labNow.subtract(const Duration(hours: 22)),
                 ),
               ],
-              createdAt: _now.subtract(const Duration(days: 3)),
+              createdAt: labNow.subtract(const Duration(days: 3)),
               createdByUid: 'bob',
-              completedAt: _now.subtract(const Duration(hours: 22)),
+              completedAt: labNow.subtract(const Duration(hours: 22)),
             ),
             currentUid: 'alice',
           ),
@@ -252,7 +253,7 @@ class WidgetLabTab extends StatelessWidget {
               id: 'mission-1',
               conceptIds: const ['a', 'b', 'c', 'd', 'e'],
               reviewedConceptIds: const ['a'],
-              createdAt: _now.subtract(const Duration(hours: 6)),
+              createdAt: labNow.subtract(const Duration(hours: 6)),
             ),
           ),
         ),
@@ -263,7 +264,7 @@ class WidgetLabTab extends StatelessWidget {
               id: 'mission-2',
               conceptIds: const ['a', 'b', 'c', 'd'],
               reviewedConceptIds: const ['a', 'b'],
-              createdAt: _now.subtract(const Duration(hours: 12)),
+              createdAt: labNow.subtract(const Duration(hours: 12)),
             ),
           ),
         ),
@@ -274,8 +275,8 @@ class WidgetLabTab extends StatelessWidget {
               id: 'mission-3',
               conceptIds: const ['a', 'b', 'c'],
               reviewedConceptIds: const ['a', 'b', 'c'],
-              createdAt: _now.subtract(const Duration(hours: 24)),
-              completedAt: _now.subtract(const Duration(hours: 1)),
+              createdAt: labNow.subtract(const Duration(hours: 24)),
+              completedAt: labNow.subtract(const Duration(hours: 1)),
             ),
           ),
         ),
@@ -313,8 +314,6 @@ class WidgetLabTab extends StatelessWidget {
       ],
     );
   }
-
-  static final _now = DateTime.now().toUtc();
 
   /// Health score that produces the given tier.
   static double _scoreForTier(HealthTier tier) {
@@ -357,12 +356,14 @@ Widget _specimen(String label, Widget child) {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            color: Colors.grey.shade500,
-            fontWeight: FontWeight.w600,
+        Builder(
+          builder: (context) => Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
         const SizedBox(height: 4),
@@ -378,12 +379,14 @@ Widget _specimenRow(String label, List<Widget> children) {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            color: Colors.grey.shade500,
-            fontWeight: FontWeight.w600,
+        Builder(
+          builder: (context) => Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
         const SizedBox(height: 4),

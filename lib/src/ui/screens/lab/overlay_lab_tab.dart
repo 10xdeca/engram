@@ -20,7 +20,6 @@ class OverlayLabTab extends StatefulWidget {
 class _OverlayLabTabState extends State<OverlayLabTab> {
   HealthTier _tier = HealthTier.healthy;
   bool _stormActive = false;
-  double _stormIntensity = 0.5;
 
   late final KnowledgeGraph _graph;
 
@@ -92,20 +91,6 @@ class _OverlayLabTabState extends State<OverlayLabTab> {
           Switch(
             value: _stormActive,
             onChanged: (v) => setState(() => _stormActive = v),
-          ),
-          // Storm intensity slider (visual reference only — the widget uses
-          // its own animation controller, but this shows the concept)
-          const Text('Intensity:', style: TextStyle(fontSize: 12)),
-          SizedBox(
-            width: 120,
-            child: Slider(
-              value: _stormIntensity,
-              onChanged: (v) => setState(() => _stormIntensity = v),
-            ),
-          ),
-          Text(
-            '${(_stormIntensity * 100).round()}%',
-            style: const TextStyle(fontSize: 11),
           ),
         ],
       ),
