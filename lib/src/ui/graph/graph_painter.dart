@@ -190,7 +190,7 @@ class GraphPainter extends CustomPainter {
           ..strokeWidth = paint.strokeWidth + glowEdgeExtraWidth
           ..style = PaintingStyle.stroke
           ..maskFilter =
-              MaskFilter.blur(BlurStyle.normal, glowEdgeBlurSigma);
+              const MaskFilter.blur(BlurStyle.normal, glowEdgeBlurSigma);
         canvas.drawLine(src, tgt, glowPaint);
       }
 
