@@ -30,6 +30,9 @@ dependencies:
   uuid: ^4.5.1
   intl: ^0.19.0
   pretty_diff_text: ^2.1.0
+  drift: ^2.24.0
+  drift_flutter: ^0.2.4
+  sqlite3_flutter_libs: ^0.5.28
 
 dev_dependencies:
   flutter_test:
@@ -39,6 +42,8 @@ dev_dependencies:
   test: ^1.26.0
   fake_cloud_firestore: ^4.0.1
   firebase_auth_mocks: ^0.15.1
+  drift_dev: ^2.24.0
+  build_runner: ^2.4.14
 
 flutter:
   uses-material-design: true
