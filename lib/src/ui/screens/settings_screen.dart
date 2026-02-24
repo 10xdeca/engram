@@ -18,6 +18,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late final TextEditingController _outlineUrlController;
   late final TextEditingController _outlineKeyController;
   late final TextEditingController _anthropicKeyController;
+  late final TextEditingController _elevenLabsKeyController;
 
   @override
   void initState() {
@@ -28,6 +29,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _anthropicKeyController = TextEditingController(
       text: config.anthropicApiKey,
     );
+    _elevenLabsKeyController = TextEditingController(
+      text: config.elevenLabsApiKey,
+    );
   }
 
   @override
@@ -35,6 +39,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _outlineUrlController.dispose();
     _outlineKeyController.dispose();
     _anthropicKeyController.dispose();
+    _elevenLabsKeyController.dispose();
     super.dispose();
   }
 
@@ -101,6 +106,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 (value) => ref
                     .read(settingsProvider.notifier)
                     .setAnthropicApiKey(value),
+          ),
+          const SizedBox(height: 24),
+          Text('ElevenLabs (Narration)', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _elevenLabsKeyController,
+            decoration: InputDecoration(
+              labelText: 'API Key',
+              hintText: 'sk_...',
+              helperText: 'Optional — enables AI narration of knowledge graph',
+              border: const OutlineInputBorder(),
+              suffixIcon:
+                  config.elevenLabsApiKey.isNotEmpty
+                      ? const Icon(Icons.check_circle, color: Colors.green)
+                      : null,
+            ),
+            obscureText: true,
+            onChanged:
+                (value) => ref
+                    .read(settingsProvider.notifier)
+                    .setElevenLabsApiKey(value),
           ),
           const SizedBox(height: 24),
           Card(
