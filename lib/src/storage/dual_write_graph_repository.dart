@@ -19,6 +19,10 @@ import 'graph_repository.dart';
 ///
 /// On the first [load], if [primary] is empty, data is seeded from [remote]
 /// (one-time migration). The [_seeded] flag prevents redundant remote loads.
+///
+/// **Phase 2 (CRDT sync):** This class is the natural place to add conflict
+/// resolution hooks when Firestore transitions from fire-and-forget writes
+/// to a proper sync peer. See `docs/CRDT_SYNC_ARCHITECTURE.md`.
 class DualWriteGraphRepository extends GraphRepository {
   DualWriteGraphRepository({
     required this.primary,
@@ -34,6 +38,10 @@ class DualWriteGraphRepository extends GraphRepository {
   final GraphRepository remote;
 
   /// Whether the initial seed check has been performed.
+  ///
+  /// Intentionally instance-scoped: when the provider rebuilds (e.g. sign-out
+  /// then sign-in as a different user), a fresh instance gets `seeded = false`
+  /// so the new user's Firestore data can be seeded into Drift.
   @visibleForTesting
   bool seeded = false;
 
