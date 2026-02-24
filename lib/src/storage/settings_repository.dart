@@ -18,6 +18,7 @@ class SettingsRepository {
   static const _keyLastSessionDate = 'last_session_date';
   static const _keyCurrentStreak = 'current_streak';
   static const _keyLongestStreak = 'longest_streak';
+  static const _keyElevenLabsApiKey = 'elevenlabs_api_key';
   static const _keyFriendDiscoveryEnabled = 'friend_discovery_enabled';
 
   EngramConfig load() {
@@ -25,6 +26,7 @@ class SettingsRepository {
       outlineApiUrl: _prefs.getString(_keyOutlineApiUrl) ?? '',
       outlineApiKey: _prefs.getString(_keyOutlineApiKey) ?? '',
       anthropicApiKey: _prefs.getString(_keyAnthropicApiKey) ?? '',
+      elevenLabsApiKey: _prefs.getString(_keyElevenLabsApiKey) ?? '',
     );
   }
 
@@ -33,6 +35,7 @@ class SettingsRepository {
       _prefs.setString(_keyOutlineApiUrl, config.outlineApiUrl),
       _prefs.setString(_keyOutlineApiKey, config.outlineApiKey),
       _prefs.setString(_keyAnthropicApiKey, config.anthropicApiKey),
+      _prefs.setString(_keyElevenLabsApiKey, config.elevenLabsApiKey),
     ]);
   }
 
@@ -44,6 +47,9 @@ class SettingsRepository {
 
   Future<void> setAnthropicApiKey(String value) =>
       _prefs.setString(_keyAnthropicApiKey, value);
+
+  Future<void> setElevenLabsApiKey(String value) =>
+      _prefs.setString(_keyElevenLabsApiKey, value);
 
   // --- Sync settings ---
 

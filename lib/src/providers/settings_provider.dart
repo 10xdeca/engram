@@ -45,4 +45,10 @@ class SettingsNotifier extends Notifier<EngramConfig> {
     await repo.setAnthropicApiKey(value);
     state = state.copyWith(anthropicApiKey: value);
   }
+
+  Future<void> setElevenLabsApiKey(String value) async {
+    final repo = ref.read(settingsRepositoryProvider);
+    await repo.setElevenLabsApiKey(value);
+    state = state.copyWith(elevenLabsApiKey: value);
+  }
 }

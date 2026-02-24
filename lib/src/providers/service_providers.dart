@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../services/elevenlabs_client.dart';
 import '../services/extraction_service.dart';
+import '../services/narration_service.dart';
 import '../services/outline_client.dart';
 import '../services/recommendation_service.dart';
 import 'settings_provider.dart';
@@ -24,4 +26,14 @@ final recommendationServiceProvider = Provider<RecommendationService>((ref) {
     outlineClient: ref.watch(outlineClientProvider),
     apiKey: config.anthropicApiKey,
   );
+});
+
+final elevenLabsClientProvider = Provider<ElevenLabsClient>((ref) {
+  final config = ref.watch(settingsProvider);
+  return ElevenLabsClient(apiKey: config.elevenLabsApiKey);
+});
+
+final narrationServiceProvider = Provider<NarrationService>((ref) {
+  final config = ref.watch(settingsProvider);
+  return NarrationService(apiKey: config.anthropicApiKey);
 });
