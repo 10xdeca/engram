@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../storage/drift/drift_graph_repository.dart';
 import '../storage/drift/engram_database.dart';
+import '../storage/dual_write_graph_repository.dart';
 import '../storage/firestore_graph_repository.dart';
 import '../storage/graph_repository.dart';
 import 'auth_provider.dart';
@@ -18,19 +19,27 @@ final engramDatabaseProvider = Provider<EngramDatabase>(
 
 /// Provides the active [GraphRepository] implementation.
 ///
-/// Uses [FirestoreGraphRepository] when user is authenticated;
-/// falls back to [DriftGraphRepository] (SQLite) for unauthenticated/offline
-/// use, replacing the old JSON-file [LocalGraphRepository].
+/// Authenticated users get a [DualWriteGraphRepository] that reads from
+/// [DriftGraphRepository] (local SQLite) and writes to both Drift and
+/// [FirestoreGraphRepository]. On first load, existing Firestore data is
+/// seeded into Drift for the one-time local-first migration.
+///
+/// Unauthenticated users get [DriftGraphRepository] only.
 final graphRepositoryProvider = Provider<GraphRepository>((ref) {
   final user = ref.watch(authStateProvider).valueOrNull;
-  final firestore = ref.watch(firestoreProvider);
+  final db = ref.watch(engramDatabaseProvider);
+  final driftRepo = DriftGraphRepository(db: db);
 
   if (user != null) {
-    return FirestoreGraphRepository(firestore: firestore, userId: user.uid);
+    final firestore = ref.watch(firestoreProvider);
+    final firestoreRepo = FirestoreGraphRepository(
+      firestore: firestore,
+      userId: user.uid,
+    );
+    return DualWriteGraphRepository(primary: driftRepo, remote: firestoreRepo);
   }
 
-  final db = ref.watch(engramDatabaseProvider);
-  return DriftGraphRepository(db: db);
+  return driftRepo;
 });
 
 /// Backward-compatible alias so existing code referencing

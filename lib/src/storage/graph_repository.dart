@@ -5,8 +5,11 @@ import '../models/relationship.dart';
 
 /// Abstract storage interface for the knowledge graph.
 ///
-/// Implementations include [LocalGraphRepository] (JSON file) and
-/// [FirestoreGraphRepository] (cloud sync).
+/// Implementations:
+/// - [DriftGraphRepository] — local SQLite via Drift (primary store)
+/// - [FirestoreGraphRepository] — cloud Firestore
+/// - [DualWriteGraphRepository] — reads from Drift, writes to both
+/// - [LocalGraphRepository] — legacy JSON file (deprecated)
 abstract class GraphRepository {
   Future<KnowledgeGraph> load();
 
