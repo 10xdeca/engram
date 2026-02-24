@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/narration_session.dart';
+import '../../providers/graph_structure_provider.dart';
 import '../../providers/narration_provider.dart';
 
 /// Compact narration playback controls.
@@ -123,18 +124,12 @@ class _PlaybackControls extends ConsumerWidget {
             ),
           ],
         ),
-        // Active concepts indicator
+        // Active concepts indicator (resolved to human-readable names)
         if (session.activeConcepts.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              session.activeConcepts.join(', '),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.cyan,
-                fontStyle: FontStyle.italic,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            child: _ActiveConceptsLabel(
+              conceptIds: session.activeConcepts.toList(),
             ),
           ),
       ],
@@ -145,6 +140,34 @@ class _PlaybackControls extends ConsumerWidget {
     final mins = seconds ~/ 60;
     final secs = (seconds % 60).round();
     return '$mins:${secs.toString().padLeft(2, '0')}';
+  }
+}
+
+/// Resolves concept IDs to human-readable names via [graphStructureProvider].
+class _ActiveConceptsLabel extends ConsumerWidget {
+  const _ActiveConceptsLabel({required this.conceptIds});
+
+  final List<String> conceptIds;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final graph = ref.watch(graphStructureProvider);
+    final nameMap = {
+      if (graph != null)
+        for (final c in graph.concepts) c.id: c.name,
+    };
+    final names =
+        conceptIds.map((id) => nameMap[id] ?? id).join(', ');
+
+    return Text(
+      names,
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+        color: Colors.cyan,
+        fontStyle: FontStyle.italic,
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
   }
 }
 

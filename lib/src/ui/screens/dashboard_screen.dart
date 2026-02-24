@@ -723,16 +723,20 @@ class _NarrateButton extends ConsumerWidget {
     final concepts = graph.concepts
         .map((c) => ConceptSummary(id: c.id, name: c.name))
         .toList();
+    final conceptNames = {for (final c in graph.concepts) c.id: c.name};
     final relationships = graph.relationships
-        .map((r) {
-          final from = graph.concepts.firstWhere((c) => c.id == r.fromConceptId);
-          final to = graph.concepts.firstWhere((c) => c.id == r.toConceptId);
-          return RelationshipSummary(
-            fromName: from.name,
-            toName: to.name,
+        .where(
+          (r) =>
+              conceptNames.containsKey(r.fromConceptId) &&
+              conceptNames.containsKey(r.toConceptId),
+        )
+        .map(
+          (r) => RelationshipSummary(
+            fromName: conceptNames[r.fromConceptId]!,
+            toName: conceptNames[r.toConceptId]!,
             label: r.label,
-          );
-        })
+          ),
+        )
         .toList();
 
     ref.read(narrationProvider.notifier).generateNarration(
