@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/dashboard_stats.dart';
 import '../../models/knowledge_gap.dart';
+import '../../models/knowledge_graph.dart';
+import '../../models/narration_session.dart';
 import '../../models/stale_document.dart';
 import '../../models/sync_status.dart';
 import '../../engine/difficulty_evaluation.dart';
@@ -14,6 +16,9 @@ import '../../providers/filtered_graph_provider.dart';
 import '../../providers/gap_analysis_provider.dart';
 import '../../providers/active_concepts_provider.dart';
 import '../../providers/glow_node_provider.dart';
+import '../../providers/narration_provider.dart';
+import '../../services/narration_service.dart';
+import '../widgets/narration_controls.dart';
 import '../../providers/graph_structure_provider.dart';
 import '../../providers/knowledge_graph_provider.dart';
 import '../../providers/network_health_provider.dart';
@@ -292,6 +297,13 @@ class _DashboardContent extends ConsumerWidget {
           right: 0,
           child: _CollectionChipBar(),
         ),
+        // Narrate button
+        if (graph != null && graph.concepts.isNotEmpty)
+          Positioned(
+            bottom: 52,
+            right: 12,
+            child: _NarrateButton(graph: graph),
+          ),
         // Compact stats bar at bottom
         Positioned(
           bottom: 0,
@@ -675,6 +687,68 @@ class _GraphStatusCard extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [Text(label), Text(value)],
+      ),
+    );
+  }
+}
+
+/// FAB-style button that triggers narration and shows playback controls.
+class _NarrateButton extends ConsumerWidget {
+  const _NarrateButton({required this.graph});
+
+  final KnowledgeGraph graph;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(narrationProvider);
+    final isActive = session.phase != NarrationPhase.idle;
+
+    return FloatingActionButton.small(
+      heroTag: 'narrate',
+      tooltip: isActive ? 'Narration controls' : 'Narrate graph',
+      onPressed: () {
+        if (isActive) {
+          _showControls(context);
+        } else {
+          _startNarration(context, ref);
+        }
+      },
+      child: Icon(
+        isActive ? Icons.graphic_eq : Icons.record_voice_over,
+      ),
+    );
+  }
+
+  void _startNarration(BuildContext context, WidgetRef ref) {
+    final concepts = graph.concepts
+        .map((c) => ConceptSummary(id: c.id, name: c.name))
+        .toList();
+    final relationships = graph.relationships
+        .map((r) {
+          final from = graph.concepts.firstWhere((c) => c.id == r.fromConceptId);
+          final to = graph.concepts.firstWhere((c) => c.id == r.toConceptId);
+          return RelationshipSummary(
+            fromName: from.name,
+            toName: to.name,
+            label: r.label,
+          );
+        })
+        .toList();
+
+    ref.read(narrationProvider.notifier).generateNarration(
+      concepts: concepts,
+      relationships: relationships,
+    );
+
+    _showControls(context);
+  }
+
+  void _showControls(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (_) => const SizedBox(
+        height: 180,
+        child: NarrationControls(),
       ),
     );
   }

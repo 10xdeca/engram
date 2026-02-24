@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../graph_lab_screen.dart';
 import 'glow_lab_tab.dart';
+import 'narration_lab_tab.dart';
 import 'overlay_lab_tab.dart';
 import 'widget_lab_tab.dart';
 
@@ -15,16 +16,18 @@ class VisualLabScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 4,
+      length: 5,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Visual Lab'),
           bottom: const TabBar(
+            isScrollable: true,
             tabs: [
               Tab(icon: Icon(Icons.hub), text: 'Graph'),
               Tab(icon: Icon(Icons.layers), text: 'Overlays'),
               Tab(icon: Icon(Icons.auto_awesome), text: 'Glow'),
               Tab(icon: Icon(Icons.widgets), text: 'Widgets'),
+              Tab(icon: Icon(Icons.record_voice_over), text: 'Narration'),
             ],
           ),
         ),
@@ -34,6 +37,7 @@ class VisualLabScreen extends StatelessWidget {
             OverlayLabTab(),
             GlowLabTab(),
             WidgetLabTab(),
+            NarrationLabTab(),
           ],
         ),
       ),
