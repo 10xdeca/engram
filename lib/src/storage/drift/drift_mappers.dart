@@ -13,10 +13,11 @@ import 'engram_database.dart';
 
 /// Maps a domain [Concept] to a Drift companion for insertion.
 ///
-/// Omits `embedding` and `hlc` — the database applies defaults (null and ''
-/// respectively). These columns are reserved for future features (#39, #41).
+/// Pass [hlc] to stamp the row with a CRDT timestamp. If omitted, the
+/// database default (empty string) is used. `embedding` is omitted
+/// (reserved for #39).
 extension ConceptToCompanion on Concept {
-  DriftConceptsCompanion toCompanion() {
+  DriftConceptsCompanion toCompanion({String hlc = ''}) {
     return DriftConceptsCompanion.insert(
       id: id,
       name: name,
@@ -27,6 +28,7 @@ extension ConceptToCompanion on Concept {
           parentConceptId != null
               ? Value(parentConceptId)
               : const Value.absent(),
+      hlc: Value(hlc),
     );
   }
 }
@@ -57,7 +59,7 @@ extension DriftConceptToDomain on DriftConcept {
 /// Always stores [Relationship.resolvedType] (never null) — the DB column
 /// is non-nullable, matching [Relationship.toJson] behaviour.
 extension RelationshipToCompanion on Relationship {
-  DriftRelationshipsCompanion toCompanion() {
+  DriftRelationshipsCompanion toCompanion({String hlc = ''}) {
     return DriftRelationshipsCompanion.insert(
       id: id,
       fromConceptId: fromConceptId,
@@ -66,6 +68,7 @@ extension RelationshipToCompanion on Relationship {
       description:
           description != null ? Value(description) : const Value.absent(),
       type: resolvedType,
+      hlc: Value(hlc),
     );
   }
 }
@@ -97,7 +100,7 @@ extension DriftRelationshipToDomain on DriftRelationship {
 /// Drift's TEXT columns handle them naturally and it keeps the schema simple
 /// for CRDT sync (string comparison works for HLC timestamps too).
 extension QuizItemToCompanion on QuizItem {
-  DriftQuizItemsCompanion toCompanion() {
+  DriftQuizItemsCompanion toCompanion({String hlc = ''}) {
     return DriftQuizItemsCompanion.insert(
       id: id,
       conceptId: conceptId,
@@ -121,6 +124,7 @@ extension QuizItemToCompanion on QuizItem {
               ? Value(predictedDifficulty)
               : const Value.absent(),
       reviewCount: Value(reviewCount),
+      hlc: Value(hlc),
     );
   }
 }
@@ -159,7 +163,7 @@ extension DriftQuizItemToDomain on DriftQuizItem {
 /// passthrough), so it maps directly. [DocumentMetadata.ingestedAt] is a
 /// DateTime that we convert to ISO 8601.
 extension DocumentMetadataToCompanion on DocumentMetadata {
-  DriftDocumentsCompanion toCompanion() {
+  DriftDocumentsCompanion toCompanion({String hlc = ''}) {
     return DriftDocumentsCompanion.insert(
       documentId: documentId,
       title: title,
@@ -173,6 +177,7 @@ extension DocumentMetadataToCompanion on DocumentMetadata {
               : const Value.absent(),
       ingestedText:
           ingestedText != null ? Value(ingestedText) : const Value.absent(),
+      hlc: Value(hlc),
     );
   }
 }
@@ -202,7 +207,7 @@ extension DriftDocumentToDomain on DriftDocument {
 /// creating [DriftTopicDocumentsCompanion] rows for each document ID in the
 /// topic's [Topic.documentIds] set.
 extension TopicToCompanion on Topic {
-  DriftTopicsCompanion toCompanion() {
+  DriftTopicsCompanion toCompanion({String hlc = ''}) {
     return DriftTopicsCompanion.insert(
       id: id,
       name: name,
@@ -213,6 +218,7 @@ extension TopicToCompanion on Topic {
           lastIngestedAt != null
               ? Value(lastIngestedAt!.toIso8601String())
               : const Value.absent(),
+      hlc: Value(hlc),
     );
   }
 }

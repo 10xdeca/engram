@@ -90,6 +90,21 @@ class $DriftConceptsTable extends DriftConcepts
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _isDeletedMeta = const VerificationMeta(
+    'isDeleted',
+  );
+  @override
+  late final GeneratedColumn<bool> isDeleted = GeneratedColumn<bool>(
+    'is_deleted',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_deleted" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -100,6 +115,7 @@ class $DriftConceptsTable extends DriftConcepts
     parentConceptId,
     embedding,
     hlc,
+    isDeleted,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -169,6 +185,12 @@ class $DriftConceptsTable extends DriftConcepts
         hlc.isAcceptableOrUnknown(data['hlc']!, _hlcMeta),
       );
     }
+    if (data.containsKey('is_deleted')) {
+      context.handle(
+        _isDeletedMeta,
+        isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta),
+      );
+    }
     return context;
   }
 
@@ -217,6 +239,11 @@ class $DriftConceptsTable extends DriftConcepts
             DriftSqlType.string,
             data['${effectivePrefix}hlc'],
           )!,
+      isDeleted:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.bool,
+            data['${effectivePrefix}is_deleted'],
+          )!,
     );
   }
 
@@ -238,6 +265,7 @@ class DriftConcept extends DataClass implements Insertable<DriftConcept> {
   final String? parentConceptId;
   final Uint8List? embedding;
   final String hlc;
+  final bool isDeleted;
   const DriftConcept({
     required this.id,
     required this.name,
@@ -247,6 +275,7 @@ class DriftConcept extends DataClass implements Insertable<DriftConcept> {
     this.parentConceptId,
     this.embedding,
     required this.hlc,
+    required this.isDeleted,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -267,6 +296,7 @@ class DriftConcept extends DataClass implements Insertable<DriftConcept> {
       map['embedding'] = Variable<Uint8List>(embedding);
     }
     map['hlc'] = Variable<String>(hlc);
+    map['is_deleted'] = Variable<bool>(isDeleted);
     return map;
   }
 
@@ -286,6 +316,7 @@ class DriftConcept extends DataClass implements Insertable<DriftConcept> {
               ? const Value.absent()
               : Value(embedding),
       hlc: Value(hlc),
+      isDeleted: Value(isDeleted),
     );
   }
 
@@ -303,6 +334,7 @@ class DriftConcept extends DataClass implements Insertable<DriftConcept> {
       parentConceptId: serializer.fromJson<String?>(json['parentConceptId']),
       embedding: serializer.fromJson<Uint8List?>(json['embedding']),
       hlc: serializer.fromJson<String>(json['hlc']),
+      isDeleted: serializer.fromJson<bool>(json['isDeleted']),
     );
   }
   @override
@@ -317,6 +349,7 @@ class DriftConcept extends DataClass implements Insertable<DriftConcept> {
       'parentConceptId': serializer.toJson<String?>(parentConceptId),
       'embedding': serializer.toJson<Uint8List?>(embedding),
       'hlc': serializer.toJson<String>(hlc),
+      'isDeleted': serializer.toJson<bool>(isDeleted),
     };
   }
 
@@ -329,6 +362,7 @@ class DriftConcept extends DataClass implements Insertable<DriftConcept> {
     Value<String?> parentConceptId = const Value.absent(),
     Value<Uint8List?> embedding = const Value.absent(),
     String? hlc,
+    bool? isDeleted,
   }) => DriftConcept(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -339,6 +373,7 @@ class DriftConcept extends DataClass implements Insertable<DriftConcept> {
         parentConceptId.present ? parentConceptId.value : this.parentConceptId,
     embedding: embedding.present ? embedding.value : this.embedding,
     hlc: hlc ?? this.hlc,
+    isDeleted: isDeleted ?? this.isDeleted,
   );
   DriftConcept copyWithCompanion(DriftConceptsCompanion data) {
     return DriftConcept(
@@ -357,6 +392,7 @@ class DriftConcept extends DataClass implements Insertable<DriftConcept> {
               : this.parentConceptId,
       embedding: data.embedding.present ? data.embedding.value : this.embedding,
       hlc: data.hlc.present ? data.hlc.value : this.hlc,
+      isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
     );
   }
 
@@ -370,7 +406,8 @@ class DriftConcept extends DataClass implements Insertable<DriftConcept> {
           ..write('tags: $tags, ')
           ..write('parentConceptId: $parentConceptId, ')
           ..write('embedding: $embedding, ')
-          ..write('hlc: $hlc')
+          ..write('hlc: $hlc, ')
+          ..write('isDeleted: $isDeleted')
           ..write(')'))
         .toString();
   }
@@ -385,6 +422,7 @@ class DriftConcept extends DataClass implements Insertable<DriftConcept> {
     parentConceptId,
     $driftBlobEquality.hash(embedding),
     hlc,
+    isDeleted,
   );
   @override
   bool operator ==(Object other) =>
@@ -397,7 +435,8 @@ class DriftConcept extends DataClass implements Insertable<DriftConcept> {
           other.tags == this.tags &&
           other.parentConceptId == this.parentConceptId &&
           $driftBlobEquality.equals(other.embedding, this.embedding) &&
-          other.hlc == this.hlc);
+          other.hlc == this.hlc &&
+          other.isDeleted == this.isDeleted);
 }
 
 class DriftConceptsCompanion extends UpdateCompanion<DriftConcept> {
@@ -409,6 +448,7 @@ class DriftConceptsCompanion extends UpdateCompanion<DriftConcept> {
   final Value<String?> parentConceptId;
   final Value<Uint8List?> embedding;
   final Value<String> hlc;
+  final Value<bool> isDeleted;
   final Value<int> rowid;
   const DriftConceptsCompanion({
     this.id = const Value.absent(),
@@ -419,6 +459,7 @@ class DriftConceptsCompanion extends UpdateCompanion<DriftConcept> {
     this.parentConceptId = const Value.absent(),
     this.embedding = const Value.absent(),
     this.hlc = const Value.absent(),
+    this.isDeleted = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   DriftConceptsCompanion.insert({
@@ -430,6 +471,7 @@ class DriftConceptsCompanion extends UpdateCompanion<DriftConcept> {
     this.parentConceptId = const Value.absent(),
     this.embedding = const Value.absent(),
     this.hlc = const Value.absent(),
+    this.isDeleted = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -445,6 +487,7 @@ class DriftConceptsCompanion extends UpdateCompanion<DriftConcept> {
     Expression<String>? parentConceptId,
     Expression<Uint8List>? embedding,
     Expression<String>? hlc,
+    Expression<bool>? isDeleted,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -456,6 +499,7 @@ class DriftConceptsCompanion extends UpdateCompanion<DriftConcept> {
       if (parentConceptId != null) 'parent_concept_id': parentConceptId,
       if (embedding != null) 'embedding': embedding,
       if (hlc != null) 'hlc': hlc,
+      if (isDeleted != null) 'is_deleted': isDeleted,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -469,6 +513,7 @@ class DriftConceptsCompanion extends UpdateCompanion<DriftConcept> {
     Value<String?>? parentConceptId,
     Value<Uint8List?>? embedding,
     Value<String>? hlc,
+    Value<bool>? isDeleted,
     Value<int>? rowid,
   }) {
     return DriftConceptsCompanion(
@@ -480,6 +525,7 @@ class DriftConceptsCompanion extends UpdateCompanion<DriftConcept> {
       parentConceptId: parentConceptId ?? this.parentConceptId,
       embedding: embedding ?? this.embedding,
       hlc: hlc ?? this.hlc,
+      isDeleted: isDeleted ?? this.isDeleted,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -513,6 +559,9 @@ class DriftConceptsCompanion extends UpdateCompanion<DriftConcept> {
     if (hlc.present) {
       map['hlc'] = Variable<String>(hlc.value);
     }
+    if (isDeleted.present) {
+      map['is_deleted'] = Variable<bool>(isDeleted.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -530,6 +579,7 @@ class DriftConceptsCompanion extends UpdateCompanion<DriftConcept> {
           ..write('parentConceptId: $parentConceptId, ')
           ..write('embedding: $embedding, ')
           ..write('hlc: $hlc, ')
+          ..write('isDeleted: $isDeleted, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -614,6 +664,21 @@ class $DriftRelationshipsTable extends DriftRelationships
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _isDeletedMeta = const VerificationMeta(
+    'isDeleted',
+  );
+  @override
+  late final GeneratedColumn<bool> isDeleted = GeneratedColumn<bool>(
+    'is_deleted',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_deleted" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -623,6 +688,7 @@ class $DriftRelationshipsTable extends DriftRelationships
     description,
     type,
     hlc,
+    isDeleted,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -686,6 +752,12 @@ class $DriftRelationshipsTable extends DriftRelationships
         hlc.isAcceptableOrUnknown(data['hlc']!, _hlcMeta),
       );
     }
+    if (data.containsKey('is_deleted')) {
+      context.handle(
+        _isDeletedMeta,
+        isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta),
+      );
+    }
     return context;
   }
 
@@ -730,6 +802,11 @@ class $DriftRelationshipsTable extends DriftRelationships
             DriftSqlType.string,
             data['${effectivePrefix}hlc'],
           )!,
+      isDeleted:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.bool,
+            data['${effectivePrefix}is_deleted'],
+          )!,
     );
   }
 
@@ -751,6 +828,7 @@ class DriftRelationship extends DataClass
   final String? description;
   final RelationshipType type;
   final String hlc;
+  final bool isDeleted;
   const DriftRelationship({
     required this.id,
     required this.fromConceptId,
@@ -759,6 +837,7 @@ class DriftRelationship extends DataClass
     this.description,
     required this.type,
     required this.hlc,
+    required this.isDeleted,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -776,6 +855,7 @@ class DriftRelationship extends DataClass
       );
     }
     map['hlc'] = Variable<String>(hlc);
+    map['is_deleted'] = Variable<bool>(isDeleted);
     return map;
   }
 
@@ -791,6 +871,7 @@ class DriftRelationship extends DataClass
               : Value(description),
       type: Value(type),
       hlc: Value(hlc),
+      isDeleted: Value(isDeleted),
     );
   }
 
@@ -807,6 +888,7 @@ class DriftRelationship extends DataClass
       description: serializer.fromJson<String?>(json['description']),
       type: serializer.fromJson<RelationshipType>(json['type']),
       hlc: serializer.fromJson<String>(json['hlc']),
+      isDeleted: serializer.fromJson<bool>(json['isDeleted']),
     );
   }
   @override
@@ -820,6 +902,7 @@ class DriftRelationship extends DataClass
       'description': serializer.toJson<String?>(description),
       'type': serializer.toJson<RelationshipType>(type),
       'hlc': serializer.toJson<String>(hlc),
+      'isDeleted': serializer.toJson<bool>(isDeleted),
     };
   }
 
@@ -831,6 +914,7 @@ class DriftRelationship extends DataClass
     Value<String?> description = const Value.absent(),
     RelationshipType? type,
     String? hlc,
+    bool? isDeleted,
   }) => DriftRelationship(
     id: id ?? this.id,
     fromConceptId: fromConceptId ?? this.fromConceptId,
@@ -839,6 +923,7 @@ class DriftRelationship extends DataClass
     description: description.present ? description.value : this.description,
     type: type ?? this.type,
     hlc: hlc ?? this.hlc,
+    isDeleted: isDeleted ?? this.isDeleted,
   );
   DriftRelationship copyWithCompanion(DriftRelationshipsCompanion data) {
     return DriftRelationship(
@@ -854,6 +939,7 @@ class DriftRelationship extends DataClass
           data.description.present ? data.description.value : this.description,
       type: data.type.present ? data.type.value : this.type,
       hlc: data.hlc.present ? data.hlc.value : this.hlc,
+      isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
     );
   }
 
@@ -866,7 +952,8 @@ class DriftRelationship extends DataClass
           ..write('label: $label, ')
           ..write('description: $description, ')
           ..write('type: $type, ')
-          ..write('hlc: $hlc')
+          ..write('hlc: $hlc, ')
+          ..write('isDeleted: $isDeleted')
           ..write(')'))
         .toString();
   }
@@ -880,6 +967,7 @@ class DriftRelationship extends DataClass
     description,
     type,
     hlc,
+    isDeleted,
   );
   @override
   bool operator ==(Object other) =>
@@ -891,7 +979,8 @@ class DriftRelationship extends DataClass
           other.label == this.label &&
           other.description == this.description &&
           other.type == this.type &&
-          other.hlc == this.hlc);
+          other.hlc == this.hlc &&
+          other.isDeleted == this.isDeleted);
 }
 
 class DriftRelationshipsCompanion extends UpdateCompanion<DriftRelationship> {
@@ -902,6 +991,7 @@ class DriftRelationshipsCompanion extends UpdateCompanion<DriftRelationship> {
   final Value<String?> description;
   final Value<RelationshipType> type;
   final Value<String> hlc;
+  final Value<bool> isDeleted;
   final Value<int> rowid;
   const DriftRelationshipsCompanion({
     this.id = const Value.absent(),
@@ -911,6 +1001,7 @@ class DriftRelationshipsCompanion extends UpdateCompanion<DriftRelationship> {
     this.description = const Value.absent(),
     this.type = const Value.absent(),
     this.hlc = const Value.absent(),
+    this.isDeleted = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   DriftRelationshipsCompanion.insert({
@@ -921,6 +1012,7 @@ class DriftRelationshipsCompanion extends UpdateCompanion<DriftRelationship> {
     this.description = const Value.absent(),
     required RelationshipType type,
     this.hlc = const Value.absent(),
+    this.isDeleted = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        fromConceptId = Value(fromConceptId),
@@ -935,6 +1027,7 @@ class DriftRelationshipsCompanion extends UpdateCompanion<DriftRelationship> {
     Expression<String>? description,
     Expression<String>? type,
     Expression<String>? hlc,
+    Expression<bool>? isDeleted,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -945,6 +1038,7 @@ class DriftRelationshipsCompanion extends UpdateCompanion<DriftRelationship> {
       if (description != null) 'description': description,
       if (type != null) 'type': type,
       if (hlc != null) 'hlc': hlc,
+      if (isDeleted != null) 'is_deleted': isDeleted,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -957,6 +1051,7 @@ class DriftRelationshipsCompanion extends UpdateCompanion<DriftRelationship> {
     Value<String?>? description,
     Value<RelationshipType>? type,
     Value<String>? hlc,
+    Value<bool>? isDeleted,
     Value<int>? rowid,
   }) {
     return DriftRelationshipsCompanion(
@@ -967,6 +1062,7 @@ class DriftRelationshipsCompanion extends UpdateCompanion<DriftRelationship> {
       description: description ?? this.description,
       type: type ?? this.type,
       hlc: hlc ?? this.hlc,
+      isDeleted: isDeleted ?? this.isDeleted,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -997,6 +1093,9 @@ class DriftRelationshipsCompanion extends UpdateCompanion<DriftRelationship> {
     if (hlc.present) {
       map['hlc'] = Variable<String>(hlc.value);
     }
+    if (isDeleted.present) {
+      map['is_deleted'] = Variable<bool>(isDeleted.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1013,6 +1112,7 @@ class DriftRelationshipsCompanion extends UpdateCompanion<DriftRelationship> {
           ..write('description: $description, ')
           ..write('type: $type, ')
           ..write('hlc: $hlc, ')
+          ..write('isDeleted: $isDeleted, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1173,6 +1273,21 @@ class $DriftQuizItemsTable extends DriftQuizItems
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _isDeletedMeta = const VerificationMeta(
+    'isDeleted',
+  );
+  @override
+  late final GeneratedColumn<bool> isDeleted = GeneratedColumn<bool>(
+    'is_deleted',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_deleted" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1189,6 +1304,7 @@ class $DriftQuizItemsTable extends DriftQuizItems
     predictedDifficulty,
     reviewCount,
     hlc,
+    isDeleted,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1301,6 +1417,12 @@ class $DriftQuizItemsTable extends DriftQuizItems
         hlc.isAcceptableOrUnknown(data['hlc']!, _hlcMeta),
       );
     }
+    if (data.containsKey('is_deleted')) {
+      context.handle(
+        _isDeletedMeta,
+        isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta),
+      );
+    }
     return context;
   }
 
@@ -1374,6 +1496,11 @@ class $DriftQuizItemsTable extends DriftQuizItems
             DriftSqlType.string,
             data['${effectivePrefix}hlc'],
           )!,
+      isDeleted:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.bool,
+            data['${effectivePrefix}is_deleted'],
+          )!,
     );
   }
 
@@ -1398,6 +1525,7 @@ class DriftQuizItem extends DataClass implements Insertable<DriftQuizItem> {
   final double? predictedDifficulty;
   final int reviewCount;
   final String hlc;
+  final bool isDeleted;
   const DriftQuizItem({
     required this.id,
     required this.conceptId,
@@ -1413,6 +1541,7 @@ class DriftQuizItem extends DataClass implements Insertable<DriftQuizItem> {
     this.predictedDifficulty,
     required this.reviewCount,
     required this.hlc,
+    required this.isDeleted,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1443,6 +1572,7 @@ class DriftQuizItem extends DataClass implements Insertable<DriftQuizItem> {
     }
     map['review_count'] = Variable<int>(reviewCount);
     map['hlc'] = Variable<String>(hlc);
+    map['is_deleted'] = Variable<bool>(isDeleted);
     return map;
   }
 
@@ -1478,6 +1608,7 @@ class DriftQuizItem extends DataClass implements Insertable<DriftQuizItem> {
               : Value(predictedDifficulty),
       reviewCount: Value(reviewCount),
       hlc: Value(hlc),
+      isDeleted: Value(isDeleted),
     );
   }
 
@@ -1503,6 +1634,7 @@ class DriftQuizItem extends DataClass implements Insertable<DriftQuizItem> {
       ),
       reviewCount: serializer.fromJson<int>(json['reviewCount']),
       hlc: serializer.fromJson<String>(json['hlc']),
+      isDeleted: serializer.fromJson<bool>(json['isDeleted']),
     );
   }
   @override
@@ -1523,6 +1655,7 @@ class DriftQuizItem extends DataClass implements Insertable<DriftQuizItem> {
       'predictedDifficulty': serializer.toJson<double?>(predictedDifficulty),
       'reviewCount': serializer.toJson<int>(reviewCount),
       'hlc': serializer.toJson<String>(hlc),
+      'isDeleted': serializer.toJson<bool>(isDeleted),
     };
   }
 
@@ -1541,6 +1674,7 @@ class DriftQuizItem extends DataClass implements Insertable<DriftQuizItem> {
     Value<double?> predictedDifficulty = const Value.absent(),
     int? reviewCount,
     String? hlc,
+    bool? isDeleted,
   }) => DriftQuizItem(
     id: id ?? this.id,
     conceptId: conceptId ?? this.conceptId,
@@ -1559,6 +1693,7 @@ class DriftQuizItem extends DataClass implements Insertable<DriftQuizItem> {
             : this.predictedDifficulty,
     reviewCount: reviewCount ?? this.reviewCount,
     hlc: hlc ?? this.hlc,
+    isDeleted: isDeleted ?? this.isDeleted,
   );
   DriftQuizItem copyWithCompanion(DriftQuizItemsCompanion data) {
     return DriftQuizItem(
@@ -1583,6 +1718,7 @@ class DriftQuizItem extends DataClass implements Insertable<DriftQuizItem> {
       reviewCount:
           data.reviewCount.present ? data.reviewCount.value : this.reviewCount,
       hlc: data.hlc.present ? data.hlc.value : this.hlc,
+      isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
     );
   }
 
@@ -1602,7 +1738,8 @@ class DriftQuizItem extends DataClass implements Insertable<DriftQuizItem> {
           ..write('lapses: $lapses, ')
           ..write('predictedDifficulty: $predictedDifficulty, ')
           ..write('reviewCount: $reviewCount, ')
-          ..write('hlc: $hlc')
+          ..write('hlc: $hlc, ')
+          ..write('isDeleted: $isDeleted')
           ..write(')'))
         .toString();
   }
@@ -1623,6 +1760,7 @@ class DriftQuizItem extends DataClass implements Insertable<DriftQuizItem> {
     predictedDifficulty,
     reviewCount,
     hlc,
+    isDeleted,
   );
   @override
   bool operator ==(Object other) =>
@@ -1641,7 +1779,8 @@ class DriftQuizItem extends DataClass implements Insertable<DriftQuizItem> {
           other.lapses == this.lapses &&
           other.predictedDifficulty == this.predictedDifficulty &&
           other.reviewCount == this.reviewCount &&
-          other.hlc == this.hlc);
+          other.hlc == this.hlc &&
+          other.isDeleted == this.isDeleted);
 }
 
 class DriftQuizItemsCompanion extends UpdateCompanion<DriftQuizItem> {
@@ -1659,6 +1798,7 @@ class DriftQuizItemsCompanion extends UpdateCompanion<DriftQuizItem> {
   final Value<double?> predictedDifficulty;
   final Value<int> reviewCount;
   final Value<String> hlc;
+  final Value<bool> isDeleted;
   final Value<int> rowid;
   const DriftQuizItemsCompanion({
     this.id = const Value.absent(),
@@ -1675,6 +1815,7 @@ class DriftQuizItemsCompanion extends UpdateCompanion<DriftQuizItem> {
     this.predictedDifficulty = const Value.absent(),
     this.reviewCount = const Value.absent(),
     this.hlc = const Value.absent(),
+    this.isDeleted = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   DriftQuizItemsCompanion.insert({
@@ -1692,6 +1833,7 @@ class DriftQuizItemsCompanion extends UpdateCompanion<DriftQuizItem> {
     this.predictedDifficulty = const Value.absent(),
     this.reviewCount = const Value.absent(),
     this.hlc = const Value.absent(),
+    this.isDeleted = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        conceptId = Value(conceptId),
@@ -1714,6 +1856,7 @@ class DriftQuizItemsCompanion extends UpdateCompanion<DriftQuizItem> {
     Expression<double>? predictedDifficulty,
     Expression<int>? reviewCount,
     Expression<String>? hlc,
+    Expression<bool>? isDeleted,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1732,6 +1875,7 @@ class DriftQuizItemsCompanion extends UpdateCompanion<DriftQuizItem> {
         'predicted_difficulty': predictedDifficulty,
       if (reviewCount != null) 'review_count': reviewCount,
       if (hlc != null) 'hlc': hlc,
+      if (isDeleted != null) 'is_deleted': isDeleted,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1751,6 +1895,7 @@ class DriftQuizItemsCompanion extends UpdateCompanion<DriftQuizItem> {
     Value<double?>? predictedDifficulty,
     Value<int>? reviewCount,
     Value<String>? hlc,
+    Value<bool>? isDeleted,
     Value<int>? rowid,
   }) {
     return DriftQuizItemsCompanion(
@@ -1768,6 +1913,7 @@ class DriftQuizItemsCompanion extends UpdateCompanion<DriftQuizItem> {
       predictedDifficulty: predictedDifficulty ?? this.predictedDifficulty,
       reviewCount: reviewCount ?? this.reviewCount,
       hlc: hlc ?? this.hlc,
+      isDeleted: isDeleted ?? this.isDeleted,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1817,6 +1963,9 @@ class DriftQuizItemsCompanion extends UpdateCompanion<DriftQuizItem> {
     if (hlc.present) {
       map['hlc'] = Variable<String>(hlc.value);
     }
+    if (isDeleted.present) {
+      map['is_deleted'] = Variable<bool>(isDeleted.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1840,6 +1989,7 @@ class DriftQuizItemsCompanion extends UpdateCompanion<DriftQuizItem> {
           ..write('predictedDifficulty: $predictedDifficulty, ')
           ..write('reviewCount: $reviewCount, ')
           ..write('hlc: $hlc, ')
+          ..write('isDeleted: $isDeleted, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1937,6 +2087,21 @@ class $DriftDocumentsTable extends DriftDocuments
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _isDeletedMeta = const VerificationMeta(
+    'isDeleted',
+  );
+  @override
+  late final GeneratedColumn<bool> isDeleted = GeneratedColumn<bool>(
+    'is_deleted',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_deleted" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     documentId,
@@ -1947,6 +2112,7 @@ class $DriftDocumentsTable extends DriftDocuments
     collectionName,
     ingestedText,
     hlc,
+    isDeleted,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2025,6 +2191,12 @@ class $DriftDocumentsTable extends DriftDocuments
         hlc.isAcceptableOrUnknown(data['hlc']!, _hlcMeta),
       );
     }
+    if (data.containsKey('is_deleted')) {
+      context.handle(
+        _isDeletedMeta,
+        isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta),
+      );
+    }
     return context;
   }
 
@@ -2071,6 +2243,11 @@ class $DriftDocumentsTable extends DriftDocuments
             DriftSqlType.string,
             data['${effectivePrefix}hlc'],
           )!,
+      isDeleted:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.bool,
+            data['${effectivePrefix}is_deleted'],
+          )!,
     );
   }
 
@@ -2089,6 +2266,7 @@ class DriftDocument extends DataClass implements Insertable<DriftDocument> {
   final String? collectionName;
   final String? ingestedText;
   final String hlc;
+  final bool isDeleted;
   const DriftDocument({
     required this.documentId,
     required this.title,
@@ -2098,6 +2276,7 @@ class DriftDocument extends DataClass implements Insertable<DriftDocument> {
     this.collectionName,
     this.ingestedText,
     required this.hlc,
+    required this.isDeleted,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2116,6 +2295,7 @@ class DriftDocument extends DataClass implements Insertable<DriftDocument> {
       map['ingested_text'] = Variable<String>(ingestedText);
     }
     map['hlc'] = Variable<String>(hlc);
+    map['is_deleted'] = Variable<bool>(isDeleted);
     return map;
   }
 
@@ -2138,6 +2318,7 @@ class DriftDocument extends DataClass implements Insertable<DriftDocument> {
               ? const Value.absent()
               : Value(ingestedText),
       hlc: Value(hlc),
+      isDeleted: Value(isDeleted),
     );
   }
 
@@ -2155,6 +2336,7 @@ class DriftDocument extends DataClass implements Insertable<DriftDocument> {
       collectionName: serializer.fromJson<String?>(json['collectionName']),
       ingestedText: serializer.fromJson<String?>(json['ingestedText']),
       hlc: serializer.fromJson<String>(json['hlc']),
+      isDeleted: serializer.fromJson<bool>(json['isDeleted']),
     );
   }
   @override
@@ -2169,6 +2351,7 @@ class DriftDocument extends DataClass implements Insertable<DriftDocument> {
       'collectionName': serializer.toJson<String?>(collectionName),
       'ingestedText': serializer.toJson<String?>(ingestedText),
       'hlc': serializer.toJson<String>(hlc),
+      'isDeleted': serializer.toJson<bool>(isDeleted),
     };
   }
 
@@ -2181,6 +2364,7 @@ class DriftDocument extends DataClass implements Insertable<DriftDocument> {
     Value<String?> collectionName = const Value.absent(),
     Value<String?> ingestedText = const Value.absent(),
     String? hlc,
+    bool? isDeleted,
   }) => DriftDocument(
     documentId: documentId ?? this.documentId,
     title: title ?? this.title,
@@ -2191,6 +2375,7 @@ class DriftDocument extends DataClass implements Insertable<DriftDocument> {
         collectionName.present ? collectionName.value : this.collectionName,
     ingestedText: ingestedText.present ? ingestedText.value : this.ingestedText,
     hlc: hlc ?? this.hlc,
+    isDeleted: isDeleted ?? this.isDeleted,
   );
   DriftDocument copyWithCompanion(DriftDocumentsCompanion data) {
     return DriftDocument(
@@ -2213,6 +2398,7 @@ class DriftDocument extends DataClass implements Insertable<DriftDocument> {
               ? data.ingestedText.value
               : this.ingestedText,
       hlc: data.hlc.present ? data.hlc.value : this.hlc,
+      isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
     );
   }
 
@@ -2226,7 +2412,8 @@ class DriftDocument extends DataClass implements Insertable<DriftDocument> {
           ..write('collectionId: $collectionId, ')
           ..write('collectionName: $collectionName, ')
           ..write('ingestedText: $ingestedText, ')
-          ..write('hlc: $hlc')
+          ..write('hlc: $hlc, ')
+          ..write('isDeleted: $isDeleted')
           ..write(')'))
         .toString();
   }
@@ -2241,6 +2428,7 @@ class DriftDocument extends DataClass implements Insertable<DriftDocument> {
     collectionName,
     ingestedText,
     hlc,
+    isDeleted,
   );
   @override
   bool operator ==(Object other) =>
@@ -2253,7 +2441,8 @@ class DriftDocument extends DataClass implements Insertable<DriftDocument> {
           other.collectionId == this.collectionId &&
           other.collectionName == this.collectionName &&
           other.ingestedText == this.ingestedText &&
-          other.hlc == this.hlc);
+          other.hlc == this.hlc &&
+          other.isDeleted == this.isDeleted);
 }
 
 class DriftDocumentsCompanion extends UpdateCompanion<DriftDocument> {
@@ -2265,6 +2454,7 @@ class DriftDocumentsCompanion extends UpdateCompanion<DriftDocument> {
   final Value<String?> collectionName;
   final Value<String?> ingestedText;
   final Value<String> hlc;
+  final Value<bool> isDeleted;
   final Value<int> rowid;
   const DriftDocumentsCompanion({
     this.documentId = const Value.absent(),
@@ -2275,6 +2465,7 @@ class DriftDocumentsCompanion extends UpdateCompanion<DriftDocument> {
     this.collectionName = const Value.absent(),
     this.ingestedText = const Value.absent(),
     this.hlc = const Value.absent(),
+    this.isDeleted = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   DriftDocumentsCompanion.insert({
@@ -2286,6 +2477,7 @@ class DriftDocumentsCompanion extends UpdateCompanion<DriftDocument> {
     this.collectionName = const Value.absent(),
     this.ingestedText = const Value.absent(),
     this.hlc = const Value.absent(),
+    this.isDeleted = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : documentId = Value(documentId),
        title = Value(title),
@@ -2300,6 +2492,7 @@ class DriftDocumentsCompanion extends UpdateCompanion<DriftDocument> {
     Expression<String>? collectionName,
     Expression<String>? ingestedText,
     Expression<String>? hlc,
+    Expression<bool>? isDeleted,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2311,6 +2504,7 @@ class DriftDocumentsCompanion extends UpdateCompanion<DriftDocument> {
       if (collectionName != null) 'collection_name': collectionName,
       if (ingestedText != null) 'ingested_text': ingestedText,
       if (hlc != null) 'hlc': hlc,
+      if (isDeleted != null) 'is_deleted': isDeleted,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2324,6 +2518,7 @@ class DriftDocumentsCompanion extends UpdateCompanion<DriftDocument> {
     Value<String?>? collectionName,
     Value<String?>? ingestedText,
     Value<String>? hlc,
+    Value<bool>? isDeleted,
     Value<int>? rowid,
   }) {
     return DriftDocumentsCompanion(
@@ -2335,6 +2530,7 @@ class DriftDocumentsCompanion extends UpdateCompanion<DriftDocument> {
       collectionName: collectionName ?? this.collectionName,
       ingestedText: ingestedText ?? this.ingestedText,
       hlc: hlc ?? this.hlc,
+      isDeleted: isDeleted ?? this.isDeleted,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2366,6 +2562,9 @@ class DriftDocumentsCompanion extends UpdateCompanion<DriftDocument> {
     if (hlc.present) {
       map['hlc'] = Variable<String>(hlc.value);
     }
+    if (isDeleted.present) {
+      map['is_deleted'] = Variable<bool>(isDeleted.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2383,6 +2582,7 @@ class DriftDocumentsCompanion extends UpdateCompanion<DriftDocument> {
           ..write('collectionName: $collectionName, ')
           ..write('ingestedText: $ingestedText, ')
           ..write('hlc: $hlc, ')
+          ..write('isDeleted: $isDeleted, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2456,6 +2656,21 @@ class $DriftTopicsTable extends DriftTopics
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _isDeletedMeta = const VerificationMeta(
+    'isDeleted',
+  );
+  @override
+  late final GeneratedColumn<bool> isDeleted = GeneratedColumn<bool>(
+    'is_deleted',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_deleted" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -2464,6 +2679,7 @@ class $DriftTopicsTable extends DriftTopics
     createdAt,
     lastIngestedAt,
     hlc,
+    isDeleted,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2522,6 +2738,12 @@ class $DriftTopicsTable extends DriftTopics
         hlc.isAcceptableOrUnknown(data['hlc']!, _hlcMeta),
       );
     }
+    if (data.containsKey('is_deleted')) {
+      context.handle(
+        _isDeletedMeta,
+        isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta),
+      );
+    }
     return context;
   }
 
@@ -2559,6 +2781,11 @@ class $DriftTopicsTable extends DriftTopics
             DriftSqlType.string,
             data['${effectivePrefix}hlc'],
           )!,
+      isDeleted:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.bool,
+            data['${effectivePrefix}is_deleted'],
+          )!,
     );
   }
 
@@ -2575,6 +2802,7 @@ class DriftTopic extends DataClass implements Insertable<DriftTopic> {
   final String createdAt;
   final String? lastIngestedAt;
   final String hlc;
+  final bool isDeleted;
   const DriftTopic({
     required this.id,
     required this.name,
@@ -2582,6 +2810,7 @@ class DriftTopic extends DataClass implements Insertable<DriftTopic> {
     required this.createdAt,
     this.lastIngestedAt,
     required this.hlc,
+    required this.isDeleted,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2596,6 +2825,7 @@ class DriftTopic extends DataClass implements Insertable<DriftTopic> {
       map['last_ingested_at'] = Variable<String>(lastIngestedAt);
     }
     map['hlc'] = Variable<String>(hlc);
+    map['is_deleted'] = Variable<bool>(isDeleted);
     return map;
   }
 
@@ -2613,6 +2843,7 @@ class DriftTopic extends DataClass implements Insertable<DriftTopic> {
               ? const Value.absent()
               : Value(lastIngestedAt),
       hlc: Value(hlc),
+      isDeleted: Value(isDeleted),
     );
   }
 
@@ -2628,6 +2859,7 @@ class DriftTopic extends DataClass implements Insertable<DriftTopic> {
       createdAt: serializer.fromJson<String>(json['createdAt']),
       lastIngestedAt: serializer.fromJson<String?>(json['lastIngestedAt']),
       hlc: serializer.fromJson<String>(json['hlc']),
+      isDeleted: serializer.fromJson<bool>(json['isDeleted']),
     );
   }
   @override
@@ -2640,6 +2872,7 @@ class DriftTopic extends DataClass implements Insertable<DriftTopic> {
       'createdAt': serializer.toJson<String>(createdAt),
       'lastIngestedAt': serializer.toJson<String?>(lastIngestedAt),
       'hlc': serializer.toJson<String>(hlc),
+      'isDeleted': serializer.toJson<bool>(isDeleted),
     };
   }
 
@@ -2650,6 +2883,7 @@ class DriftTopic extends DataClass implements Insertable<DriftTopic> {
     String? createdAt,
     Value<String?> lastIngestedAt = const Value.absent(),
     String? hlc,
+    bool? isDeleted,
   }) => DriftTopic(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -2658,6 +2892,7 @@ class DriftTopic extends DataClass implements Insertable<DriftTopic> {
     lastIngestedAt:
         lastIngestedAt.present ? lastIngestedAt.value : this.lastIngestedAt,
     hlc: hlc ?? this.hlc,
+    isDeleted: isDeleted ?? this.isDeleted,
   );
   DriftTopic copyWithCompanion(DriftTopicsCompanion data) {
     return DriftTopic(
@@ -2671,6 +2906,7 @@ class DriftTopic extends DataClass implements Insertable<DriftTopic> {
               ? data.lastIngestedAt.value
               : this.lastIngestedAt,
       hlc: data.hlc.present ? data.hlc.value : this.hlc,
+      isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
     );
   }
 
@@ -2682,14 +2918,22 @@ class DriftTopic extends DataClass implements Insertable<DriftTopic> {
           ..write('description: $description, ')
           ..write('createdAt: $createdAt, ')
           ..write('lastIngestedAt: $lastIngestedAt, ')
-          ..write('hlc: $hlc')
+          ..write('hlc: $hlc, ')
+          ..write('isDeleted: $isDeleted')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, name, description, createdAt, lastIngestedAt, hlc);
+  int get hashCode => Object.hash(
+    id,
+    name,
+    description,
+    createdAt,
+    lastIngestedAt,
+    hlc,
+    isDeleted,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2699,7 +2943,8 @@ class DriftTopic extends DataClass implements Insertable<DriftTopic> {
           other.description == this.description &&
           other.createdAt == this.createdAt &&
           other.lastIngestedAt == this.lastIngestedAt &&
-          other.hlc == this.hlc);
+          other.hlc == this.hlc &&
+          other.isDeleted == this.isDeleted);
 }
 
 class DriftTopicsCompanion extends UpdateCompanion<DriftTopic> {
@@ -2709,6 +2954,7 @@ class DriftTopicsCompanion extends UpdateCompanion<DriftTopic> {
   final Value<String> createdAt;
   final Value<String?> lastIngestedAt;
   final Value<String> hlc;
+  final Value<bool> isDeleted;
   final Value<int> rowid;
   const DriftTopicsCompanion({
     this.id = const Value.absent(),
@@ -2717,6 +2963,7 @@ class DriftTopicsCompanion extends UpdateCompanion<DriftTopic> {
     this.createdAt = const Value.absent(),
     this.lastIngestedAt = const Value.absent(),
     this.hlc = const Value.absent(),
+    this.isDeleted = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   DriftTopicsCompanion.insert({
@@ -2726,6 +2973,7 @@ class DriftTopicsCompanion extends UpdateCompanion<DriftTopic> {
     required String createdAt,
     this.lastIngestedAt = const Value.absent(),
     this.hlc = const Value.absent(),
+    this.isDeleted = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -2737,6 +2985,7 @@ class DriftTopicsCompanion extends UpdateCompanion<DriftTopic> {
     Expression<String>? createdAt,
     Expression<String>? lastIngestedAt,
     Expression<String>? hlc,
+    Expression<bool>? isDeleted,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2746,6 +2995,7 @@ class DriftTopicsCompanion extends UpdateCompanion<DriftTopic> {
       if (createdAt != null) 'created_at': createdAt,
       if (lastIngestedAt != null) 'last_ingested_at': lastIngestedAt,
       if (hlc != null) 'hlc': hlc,
+      if (isDeleted != null) 'is_deleted': isDeleted,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2757,6 +3007,7 @@ class DriftTopicsCompanion extends UpdateCompanion<DriftTopic> {
     Value<String>? createdAt,
     Value<String?>? lastIngestedAt,
     Value<String>? hlc,
+    Value<bool>? isDeleted,
     Value<int>? rowid,
   }) {
     return DriftTopicsCompanion(
@@ -2766,6 +3017,7 @@ class DriftTopicsCompanion extends UpdateCompanion<DriftTopic> {
       createdAt: createdAt ?? this.createdAt,
       lastIngestedAt: lastIngestedAt ?? this.lastIngestedAt,
       hlc: hlc ?? this.hlc,
+      isDeleted: isDeleted ?? this.isDeleted,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2791,6 +3043,9 @@ class DriftTopicsCompanion extends UpdateCompanion<DriftTopic> {
     if (hlc.present) {
       map['hlc'] = Variable<String>(hlc.value);
     }
+    if (isDeleted.present) {
+      map['is_deleted'] = Variable<bool>(isDeleted.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2806,6 +3061,7 @@ class DriftTopicsCompanion extends UpdateCompanion<DriftTopic> {
           ..write('createdAt: $createdAt, ')
           ..write('lastIngestedAt: $lastIngestedAt, ')
           ..write('hlc: $hlc, ')
+          ..write('isDeleted: $isDeleted, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2850,8 +3106,23 @@ class $DriftTopicDocumentsTable extends DriftTopicDocuments
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _isDeletedMeta = const VerificationMeta(
+    'isDeleted',
+  );
   @override
-  List<GeneratedColumn> get $columns => [topicId, documentId, hlc];
+  late final GeneratedColumn<bool> isDeleted = GeneratedColumn<bool>(
+    'is_deleted',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_deleted" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [topicId, documentId, hlc, isDeleted];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -2886,6 +3157,12 @@ class $DriftTopicDocumentsTable extends DriftTopicDocuments
         hlc.isAcceptableOrUnknown(data['hlc']!, _hlcMeta),
       );
     }
+    if (data.containsKey('is_deleted')) {
+      context.handle(
+        _isDeletedMeta,
+        isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta),
+      );
+    }
     return context;
   }
 
@@ -2910,6 +3187,11 @@ class $DriftTopicDocumentsTable extends DriftTopicDocuments
             DriftSqlType.string,
             data['${effectivePrefix}hlc'],
           )!,
+      isDeleted:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.bool,
+            data['${effectivePrefix}is_deleted'],
+          )!,
     );
   }
 
@@ -2924,10 +3206,12 @@ class DriftTopicDocument extends DataClass
   final String topicId;
   final String documentId;
   final String hlc;
+  final bool isDeleted;
   const DriftTopicDocument({
     required this.topicId,
     required this.documentId,
     required this.hlc,
+    required this.isDeleted,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2935,6 +3219,7 @@ class DriftTopicDocument extends DataClass
     map['topic_id'] = Variable<String>(topicId);
     map['document_id'] = Variable<String>(documentId);
     map['hlc'] = Variable<String>(hlc);
+    map['is_deleted'] = Variable<bool>(isDeleted);
     return map;
   }
 
@@ -2943,6 +3228,7 @@ class DriftTopicDocument extends DataClass
       topicId: Value(topicId),
       documentId: Value(documentId),
       hlc: Value(hlc),
+      isDeleted: Value(isDeleted),
     );
   }
 
@@ -2955,6 +3241,7 @@ class DriftTopicDocument extends DataClass
       topicId: serializer.fromJson<String>(json['topicId']),
       documentId: serializer.fromJson<String>(json['documentId']),
       hlc: serializer.fromJson<String>(json['hlc']),
+      isDeleted: serializer.fromJson<bool>(json['isDeleted']),
     );
   }
   @override
@@ -2964,6 +3251,7 @@ class DriftTopicDocument extends DataClass
       'topicId': serializer.toJson<String>(topicId),
       'documentId': serializer.toJson<String>(documentId),
       'hlc': serializer.toJson<String>(hlc),
+      'isDeleted': serializer.toJson<bool>(isDeleted),
     };
   }
 
@@ -2971,10 +3259,12 @@ class DriftTopicDocument extends DataClass
     String? topicId,
     String? documentId,
     String? hlc,
+    bool? isDeleted,
   }) => DriftTopicDocument(
     topicId: topicId ?? this.topicId,
     documentId: documentId ?? this.documentId,
     hlc: hlc ?? this.hlc,
+    isDeleted: isDeleted ?? this.isDeleted,
   );
   DriftTopicDocument copyWithCompanion(DriftTopicDocumentsCompanion data) {
     return DriftTopicDocument(
@@ -2982,6 +3272,7 @@ class DriftTopicDocument extends DataClass
       documentId:
           data.documentId.present ? data.documentId.value : this.documentId,
       hlc: data.hlc.present ? data.hlc.value : this.hlc,
+      isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
     );
   }
 
@@ -2990,37 +3281,42 @@ class DriftTopicDocument extends DataClass
     return (StringBuffer('DriftTopicDocument(')
           ..write('topicId: $topicId, ')
           ..write('documentId: $documentId, ')
-          ..write('hlc: $hlc')
+          ..write('hlc: $hlc, ')
+          ..write('isDeleted: $isDeleted')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(topicId, documentId, hlc);
+  int get hashCode => Object.hash(topicId, documentId, hlc, isDeleted);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is DriftTopicDocument &&
           other.topicId == this.topicId &&
           other.documentId == this.documentId &&
-          other.hlc == this.hlc);
+          other.hlc == this.hlc &&
+          other.isDeleted == this.isDeleted);
 }
 
 class DriftTopicDocumentsCompanion extends UpdateCompanion<DriftTopicDocument> {
   final Value<String> topicId;
   final Value<String> documentId;
   final Value<String> hlc;
+  final Value<bool> isDeleted;
   final Value<int> rowid;
   const DriftTopicDocumentsCompanion({
     this.topicId = const Value.absent(),
     this.documentId = const Value.absent(),
     this.hlc = const Value.absent(),
+    this.isDeleted = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   DriftTopicDocumentsCompanion.insert({
     required String topicId,
     required String documentId,
     this.hlc = const Value.absent(),
+    this.isDeleted = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : topicId = Value(topicId),
        documentId = Value(documentId);
@@ -3028,12 +3324,14 @@ class DriftTopicDocumentsCompanion extends UpdateCompanion<DriftTopicDocument> {
     Expression<String>? topicId,
     Expression<String>? documentId,
     Expression<String>? hlc,
+    Expression<bool>? isDeleted,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (topicId != null) 'topic_id': topicId,
       if (documentId != null) 'document_id': documentId,
       if (hlc != null) 'hlc': hlc,
+      if (isDeleted != null) 'is_deleted': isDeleted,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -3042,12 +3340,14 @@ class DriftTopicDocumentsCompanion extends UpdateCompanion<DriftTopicDocument> {
     Value<String>? topicId,
     Value<String>? documentId,
     Value<String>? hlc,
+    Value<bool>? isDeleted,
     Value<int>? rowid,
   }) {
     return DriftTopicDocumentsCompanion(
       topicId: topicId ?? this.topicId,
       documentId: documentId ?? this.documentId,
       hlc: hlc ?? this.hlc,
+      isDeleted: isDeleted ?? this.isDeleted,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -3064,6 +3364,9 @@ class DriftTopicDocumentsCompanion extends UpdateCompanion<DriftTopicDocument> {
     if (hlc.present) {
       map['hlc'] = Variable<String>(hlc.value);
     }
+    if (isDeleted.present) {
+      map['is_deleted'] = Variable<bool>(isDeleted.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -3076,6 +3379,7 @@ class DriftTopicDocumentsCompanion extends UpdateCompanion<DriftTopicDocument> {
           ..write('topicId: $topicId, ')
           ..write('documentId: $documentId, ')
           ..write('hlc: $hlc, ')
+          ..write('isDeleted: $isDeleted, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -3142,6 +3446,7 @@ typedef $$DriftConceptsTableCreateCompanionBuilder =
       Value<String?> parentConceptId,
       Value<Uint8List?> embedding,
       Value<String> hlc,
+      Value<bool> isDeleted,
       Value<int> rowid,
     });
 typedef $$DriftConceptsTableUpdateCompanionBuilder =
@@ -3154,6 +3459,7 @@ typedef $$DriftConceptsTableUpdateCompanionBuilder =
       Value<String?> parentConceptId,
       Value<Uint8List?> embedding,
       Value<String> hlc,
+      Value<bool> isDeleted,
       Value<int> rowid,
     });
 
@@ -3206,6 +3512,11 @@ class $$DriftConceptsTableFilterComposer
     column: $table.hlc,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<bool> get isDeleted => $composableBuilder(
+    column: $table.isDeleted,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$DriftConceptsTableOrderingComposer
@@ -3256,6 +3567,11 @@ class $$DriftConceptsTableOrderingComposer
     column: $table.hlc,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get isDeleted => $composableBuilder(
+    column: $table.isDeleted,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$DriftConceptsTableAnnotationComposer
@@ -3296,6 +3612,9 @@ class $$DriftConceptsTableAnnotationComposer
 
   GeneratedColumn<String> get hlc =>
       $composableBuilder(column: $table.hlc, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDeleted =>
+      $composableBuilder(column: $table.isDeleted, builder: (column) => column);
 }
 
 class $$DriftConceptsTableTableManager
@@ -3343,6 +3662,7 @@ class $$DriftConceptsTableTableManager
                 Value<String?> parentConceptId = const Value.absent(),
                 Value<Uint8List?> embedding = const Value.absent(),
                 Value<String> hlc = const Value.absent(),
+                Value<bool> isDeleted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DriftConceptsCompanion(
                 id: id,
@@ -3353,6 +3673,7 @@ class $$DriftConceptsTableTableManager
                 parentConceptId: parentConceptId,
                 embedding: embedding,
                 hlc: hlc,
+                isDeleted: isDeleted,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3365,6 +3686,7 @@ class $$DriftConceptsTableTableManager
                 Value<String?> parentConceptId = const Value.absent(),
                 Value<Uint8List?> embedding = const Value.absent(),
                 Value<String> hlc = const Value.absent(),
+                Value<bool> isDeleted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DriftConceptsCompanion.insert(
                 id: id,
@@ -3375,6 +3697,7 @@ class $$DriftConceptsTableTableManager
                 parentConceptId: parentConceptId,
                 embedding: embedding,
                 hlc: hlc,
+                isDeleted: isDeleted,
                 rowid: rowid,
               ),
           withReferenceMapper:
@@ -3418,6 +3741,7 @@ typedef $$DriftRelationshipsTableCreateCompanionBuilder =
       Value<String?> description,
       required RelationshipType type,
       Value<String> hlc,
+      Value<bool> isDeleted,
       Value<int> rowid,
     });
 typedef $$DriftRelationshipsTableUpdateCompanionBuilder =
@@ -3429,6 +3753,7 @@ typedef $$DriftRelationshipsTableUpdateCompanionBuilder =
       Value<String?> description,
       Value<RelationshipType> type,
       Value<String> hlc,
+      Value<bool> isDeleted,
       Value<int> rowid,
     });
 
@@ -3476,6 +3801,11 @@ class $$DriftRelationshipsTableFilterComposer
     column: $table.hlc,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<bool> get isDeleted => $composableBuilder(
+    column: $table.isDeleted,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$DriftRelationshipsTableOrderingComposer
@@ -3521,6 +3851,11 @@ class $$DriftRelationshipsTableOrderingComposer
     column: $table.hlc,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get isDeleted => $composableBuilder(
+    column: $table.isDeleted,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$DriftRelationshipsTableAnnotationComposer
@@ -3558,6 +3893,9 @@ class $$DriftRelationshipsTableAnnotationComposer
 
   GeneratedColumn<String> get hlc =>
       $composableBuilder(column: $table.hlc, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDeleted =>
+      $composableBuilder(column: $table.isDeleted, builder: (column) => column);
 }
 
 class $$DriftRelationshipsTableTableManager
@@ -3613,6 +3951,7 @@ class $$DriftRelationshipsTableTableManager
                 Value<String?> description = const Value.absent(),
                 Value<RelationshipType> type = const Value.absent(),
                 Value<String> hlc = const Value.absent(),
+                Value<bool> isDeleted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DriftRelationshipsCompanion(
                 id: id,
@@ -3622,6 +3961,7 @@ class $$DriftRelationshipsTableTableManager
                 description: description,
                 type: type,
                 hlc: hlc,
+                isDeleted: isDeleted,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3633,6 +3973,7 @@ class $$DriftRelationshipsTableTableManager
                 Value<String?> description = const Value.absent(),
                 required RelationshipType type,
                 Value<String> hlc = const Value.absent(),
+                Value<bool> isDeleted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DriftRelationshipsCompanion.insert(
                 id: id,
@@ -3642,6 +3983,7 @@ class $$DriftRelationshipsTableTableManager
                 description: description,
                 type: type,
                 hlc: hlc,
+                isDeleted: isDeleted,
                 rowid: rowid,
               ),
           withReferenceMapper:
@@ -3696,6 +4038,7 @@ typedef $$DriftQuizItemsTableCreateCompanionBuilder =
       Value<double?> predictedDifficulty,
       Value<int> reviewCount,
       Value<String> hlc,
+      Value<bool> isDeleted,
       Value<int> rowid,
     });
 typedef $$DriftQuizItemsTableUpdateCompanionBuilder =
@@ -3714,6 +4057,7 @@ typedef $$DriftQuizItemsTableUpdateCompanionBuilder =
       Value<double?> predictedDifficulty,
       Value<int> reviewCount,
       Value<String> hlc,
+      Value<bool> isDeleted,
       Value<int> rowid,
     });
 
@@ -3793,6 +4137,11 @@ class $$DriftQuizItemsTableFilterComposer
 
   ColumnFilters<String> get hlc => $composableBuilder(
     column: $table.hlc,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isDeleted => $composableBuilder(
+    column: $table.isDeleted,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -3875,6 +4224,11 @@ class $$DriftQuizItemsTableOrderingComposer
     column: $table.hlc,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get isDeleted => $composableBuilder(
+    column: $table.isDeleted,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$DriftQuizItemsTableAnnotationComposer
@@ -3937,6 +4291,9 @@ class $$DriftQuizItemsTableAnnotationComposer
 
   GeneratedColumn<String> get hlc =>
       $composableBuilder(column: $table.hlc, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDeleted =>
+      $composableBuilder(column: $table.isDeleted, builder: (column) => column);
 }
 
 class $$DriftQuizItemsTableTableManager
@@ -3994,6 +4351,7 @@ class $$DriftQuizItemsTableTableManager
                 Value<double?> predictedDifficulty = const Value.absent(),
                 Value<int> reviewCount = const Value.absent(),
                 Value<String> hlc = const Value.absent(),
+                Value<bool> isDeleted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DriftQuizItemsCompanion(
                 id: id,
@@ -4010,6 +4368,7 @@ class $$DriftQuizItemsTableTableManager
                 predictedDifficulty: predictedDifficulty,
                 reviewCount: reviewCount,
                 hlc: hlc,
+                isDeleted: isDeleted,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -4028,6 +4387,7 @@ class $$DriftQuizItemsTableTableManager
                 Value<double?> predictedDifficulty = const Value.absent(),
                 Value<int> reviewCount = const Value.absent(),
                 Value<String> hlc = const Value.absent(),
+                Value<bool> isDeleted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DriftQuizItemsCompanion.insert(
                 id: id,
@@ -4044,6 +4404,7 @@ class $$DriftQuizItemsTableTableManager
                 predictedDifficulty: predictedDifficulty,
                 reviewCount: reviewCount,
                 hlc: hlc,
+                isDeleted: isDeleted,
                 rowid: rowid,
               ),
           withReferenceMapper:
@@ -4088,6 +4449,7 @@ typedef $$DriftDocumentsTableCreateCompanionBuilder =
       Value<String?> collectionName,
       Value<String?> ingestedText,
       Value<String> hlc,
+      Value<bool> isDeleted,
       Value<int> rowid,
     });
 typedef $$DriftDocumentsTableUpdateCompanionBuilder =
@@ -4100,6 +4462,7 @@ typedef $$DriftDocumentsTableUpdateCompanionBuilder =
       Value<String?> collectionName,
       Value<String?> ingestedText,
       Value<String> hlc,
+      Value<bool> isDeleted,
       Value<int> rowid,
     });
 
@@ -4149,6 +4512,11 @@ class $$DriftDocumentsTableFilterComposer
 
   ColumnFilters<String> get hlc => $composableBuilder(
     column: $table.hlc,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isDeleted => $composableBuilder(
+    column: $table.isDeleted,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -4201,6 +4569,11 @@ class $$DriftDocumentsTableOrderingComposer
     column: $table.hlc,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get isDeleted => $composableBuilder(
+    column: $table.isDeleted,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$DriftDocumentsTableAnnotationComposer
@@ -4245,6 +4618,9 @@ class $$DriftDocumentsTableAnnotationComposer
 
   GeneratedColumn<String> get hlc =>
       $composableBuilder(column: $table.hlc, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDeleted =>
+      $composableBuilder(column: $table.isDeleted, builder: (column) => column);
 }
 
 class $$DriftDocumentsTableTableManager
@@ -4296,6 +4672,7 @@ class $$DriftDocumentsTableTableManager
                 Value<String?> collectionName = const Value.absent(),
                 Value<String?> ingestedText = const Value.absent(),
                 Value<String> hlc = const Value.absent(),
+                Value<bool> isDeleted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DriftDocumentsCompanion(
                 documentId: documentId,
@@ -4306,6 +4683,7 @@ class $$DriftDocumentsTableTableManager
                 collectionName: collectionName,
                 ingestedText: ingestedText,
                 hlc: hlc,
+                isDeleted: isDeleted,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -4318,6 +4696,7 @@ class $$DriftDocumentsTableTableManager
                 Value<String?> collectionName = const Value.absent(),
                 Value<String?> ingestedText = const Value.absent(),
                 Value<String> hlc = const Value.absent(),
+                Value<bool> isDeleted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DriftDocumentsCompanion.insert(
                 documentId: documentId,
@@ -4328,6 +4707,7 @@ class $$DriftDocumentsTableTableManager
                 collectionName: collectionName,
                 ingestedText: ingestedText,
                 hlc: hlc,
+                isDeleted: isDeleted,
                 rowid: rowid,
               ),
           withReferenceMapper:
@@ -4370,6 +4750,7 @@ typedef $$DriftTopicsTableCreateCompanionBuilder =
       required String createdAt,
       Value<String?> lastIngestedAt,
       Value<String> hlc,
+      Value<bool> isDeleted,
       Value<int> rowid,
     });
 typedef $$DriftTopicsTableUpdateCompanionBuilder =
@@ -4380,6 +4761,7 @@ typedef $$DriftTopicsTableUpdateCompanionBuilder =
       Value<String> createdAt,
       Value<String?> lastIngestedAt,
       Value<String> hlc,
+      Value<bool> isDeleted,
       Value<int> rowid,
     });
 
@@ -4419,6 +4801,11 @@ class $$DriftTopicsTableFilterComposer
 
   ColumnFilters<String> get hlc => $composableBuilder(
     column: $table.hlc,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isDeleted => $composableBuilder(
+    column: $table.isDeleted,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -4461,6 +4848,11 @@ class $$DriftTopicsTableOrderingComposer
     column: $table.hlc,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get isDeleted => $composableBuilder(
+    column: $table.isDeleted,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$DriftTopicsTableAnnotationComposer
@@ -4493,6 +4885,9 @@ class $$DriftTopicsTableAnnotationComposer
 
   GeneratedColumn<String> get hlc =>
       $composableBuilder(column: $table.hlc, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDeleted =>
+      $composableBuilder(column: $table.isDeleted, builder: (column) => column);
 }
 
 class $$DriftTopicsTableTableManager
@@ -4533,6 +4928,7 @@ class $$DriftTopicsTableTableManager
                 Value<String> createdAt = const Value.absent(),
                 Value<String?> lastIngestedAt = const Value.absent(),
                 Value<String> hlc = const Value.absent(),
+                Value<bool> isDeleted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DriftTopicsCompanion(
                 id: id,
@@ -4541,6 +4937,7 @@ class $$DriftTopicsTableTableManager
                 createdAt: createdAt,
                 lastIngestedAt: lastIngestedAt,
                 hlc: hlc,
+                isDeleted: isDeleted,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -4551,6 +4948,7 @@ class $$DriftTopicsTableTableManager
                 required String createdAt,
                 Value<String?> lastIngestedAt = const Value.absent(),
                 Value<String> hlc = const Value.absent(),
+                Value<bool> isDeleted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DriftTopicsCompanion.insert(
                 id: id,
@@ -4559,6 +4957,7 @@ class $$DriftTopicsTableTableManager
                 createdAt: createdAt,
                 lastIngestedAt: lastIngestedAt,
                 hlc: hlc,
+                isDeleted: isDeleted,
                 rowid: rowid,
               ),
           withReferenceMapper:
@@ -4598,6 +4997,7 @@ typedef $$DriftTopicDocumentsTableCreateCompanionBuilder =
       required String topicId,
       required String documentId,
       Value<String> hlc,
+      Value<bool> isDeleted,
       Value<int> rowid,
     });
 typedef $$DriftTopicDocumentsTableUpdateCompanionBuilder =
@@ -4605,6 +5005,7 @@ typedef $$DriftTopicDocumentsTableUpdateCompanionBuilder =
       Value<String> topicId,
       Value<String> documentId,
       Value<String> hlc,
+      Value<bool> isDeleted,
       Value<int> rowid,
     });
 
@@ -4629,6 +5030,11 @@ class $$DriftTopicDocumentsTableFilterComposer
 
   ColumnFilters<String> get hlc => $composableBuilder(
     column: $table.hlc,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isDeleted => $composableBuilder(
+    column: $table.isDeleted,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -4656,6 +5062,11 @@ class $$DriftTopicDocumentsTableOrderingComposer
     column: $table.hlc,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get isDeleted => $composableBuilder(
+    column: $table.isDeleted,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$DriftTopicDocumentsTableAnnotationComposer
@@ -4677,6 +5088,9 @@ class $$DriftTopicDocumentsTableAnnotationComposer
 
   GeneratedColumn<String> get hlc =>
       $composableBuilder(column: $table.hlc, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDeleted =>
+      $composableBuilder(column: $table.isDeleted, builder: (column) => column);
 }
 
 class $$DriftTopicDocumentsTableTableManager
@@ -4728,11 +5142,13 @@ class $$DriftTopicDocumentsTableTableManager
                 Value<String> topicId = const Value.absent(),
                 Value<String> documentId = const Value.absent(),
                 Value<String> hlc = const Value.absent(),
+                Value<bool> isDeleted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DriftTopicDocumentsCompanion(
                 topicId: topicId,
                 documentId: documentId,
                 hlc: hlc,
+                isDeleted: isDeleted,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -4740,11 +5156,13 @@ class $$DriftTopicDocumentsTableTableManager
                 required String topicId,
                 required String documentId,
                 Value<String> hlc = const Value.absent(),
+                Value<bool> isDeleted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DriftTopicDocumentsCompanion.insert(
                 topicId: topicId,
                 documentId: documentId,
                 hlc: hlc,
+                isDeleted: isDeleted,
                 rowid: rowid,
               ),
           withReferenceMapper:

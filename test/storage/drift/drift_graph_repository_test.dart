@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:drift/native.dart';
+import 'package:engram/src/crdt/hlc_manager.dart';
 import 'package:engram/src/models/concept.dart';
 import 'package:engram/src/models/document_metadata.dart';
 import 'package:engram/src/models/knowledge_graph.dart';
@@ -505,6 +506,239 @@ void main() {
       // doc2 is shared but each topic independently tracks it
       expect(topicA.documentIds.contains('doc2'), isTrue);
       expect(topicB.documentIds.contains('doc2'), isTrue);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // HLC stamping (#41)
+  // ---------------------------------------------------------------------------
+
+  group('HLC stamping', () {
+    late HlcManager hlcManager;
+    late DriftGraphRepository hlcRepo;
+
+    setUp(() {
+      hlcManager = HlcManager(nodeId: 'test-device-001');
+      hlcRepo = DriftGraphRepository(db: db, hlcManager: hlcManager);
+    });
+
+    test('save stamps all rows with HLC timestamps', () async {
+      final graph = KnowledgeGraph(
+        concepts: [
+          Concept(
+            id: 'c1',
+            name: 'Test',
+            description: 'Test',
+            sourceDocumentId: 'doc1',
+          ),
+        ],
+        quizItems: [
+          testQuizItem(id: 'q1', conceptId: 'c1'),
+        ],
+      );
+
+      await hlcRepo.save(graph);
+
+      // Read raw rows to verify HLC was stamped
+      final concepts = await db.select(db.driftConcepts).get();
+      expect(concepts.first.hlc, isNotEmpty);
+      expect(concepts.first.hlc, contains('test-device-001'));
+
+      final quizItems = await db.select(db.driftQuizItems).get();
+      expect(quizItems.first.hlc, isNotEmpty);
+      expect(quizItems.first.hlc, contains('test-device-001'));
+    });
+
+    test('updateQuizItem stamps the updated row with HLC', () async {
+      final graph = KnowledgeGraph(
+        concepts: [
+          Concept(
+            id: 'c1',
+            name: 'Test',
+            description: 'Test',
+            sourceDocumentId: 'doc1',
+          ),
+        ],
+        quizItems: [
+          testQuizItem(id: 'q1', conceptId: 'c1'),
+        ],
+      );
+
+      await hlcRepo.save(graph);
+      final hlcAfterSave = (await db.select(db.driftQuizItems).get())
+          .first
+          .hlc;
+
+      // Update the quiz item
+      final updated = testQuizItem(
+        id: 'q1',
+        conceptId: 'c1',
+        difficulty: 5.0,
+      );
+      await hlcRepo.updateQuizItem(graph, updated);
+
+      final hlcAfterUpdate = (await db.select(db.driftQuizItems).get())
+          .first
+          .hlc;
+
+      // HLC should have advanced
+      expect(hlcAfterUpdate, isNot(equals(hlcAfterSave)));
+      expect(hlcAfterUpdate.compareTo(hlcAfterSave), greaterThan(0));
+    });
+
+    test('saveSplitData stamps new rows with HLC', () async {
+      final graph = KnowledgeGraph(
+        concepts: [
+          Concept(
+            id: 'c1',
+            name: 'Parent',
+            description: 'Parent concept',
+            sourceDocumentId: 'doc1',
+          ),
+        ],
+      );
+      await hlcRepo.save(graph);
+
+      await hlcRepo.saveSplitData(
+        graph: graph,
+        concepts: [
+          Concept(
+            id: 'c1-sub',
+            name: 'Child',
+            description: 'Child concept',
+            sourceDocumentId: 'doc1',
+            parentConceptId: 'c1',
+          ),
+        ],
+        relationships: [],
+        quizItems: [],
+      );
+
+      final concepts = await db.select(db.driftConcepts).get();
+      final child = concepts.firstWhere((c) => c.id == 'c1-sub');
+      expect(child.hlc, isNotEmpty);
+      expect(child.hlc, contains('test-device-001'));
+    });
+
+    test('without HlcManager, hlc defaults to empty string', () async {
+      // repo (without HlcManager) is the default from outer setUp
+      final graph = KnowledgeGraph(
+        concepts: [
+          Concept(
+            id: 'c1',
+            name: 'Test',
+            description: 'Test',
+            sourceDocumentId: 'doc1',
+          ),
+        ],
+      );
+      await repo.save(graph);
+
+      final concepts = await db.select(db.driftConcepts).get();
+      expect(concepts.first.hlc, isEmpty);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // isDeleted tombstone filtering (#41)
+  // ---------------------------------------------------------------------------
+
+  group('isDeleted filtering', () {
+    test('load excludes rows with isDeleted = true', () async {
+      // Insert a concept normally
+      await repo.save(KnowledgeGraph(
+        concepts: [
+          Concept(
+            id: 'c1',
+            name: 'Visible',
+            description: 'Should appear',
+            sourceDocumentId: 'doc1',
+          ),
+        ],
+      ));
+
+      // Tombstone it via raw SQL (simulating a CRDT merge)
+      await db.customStatement(
+        "UPDATE drift_concepts SET is_deleted = 1 WHERE id = 'c1'",
+      );
+
+      final loaded = await repo.load();
+      expect(loaded.concepts, isEmpty,
+          reason: 'Tombstoned concept should not appear in load()');
+    });
+
+    test('tombstoned rows still exist in raw DB', () async {
+      await repo.save(KnowledgeGraph(
+        concepts: [
+          Concept(
+            id: 'c1',
+            name: 'Tombstoned',
+            description: 'Hidden but present',
+            sourceDocumentId: 'doc1',
+          ),
+        ],
+      ));
+
+      await db.customStatement(
+        "UPDATE drift_concepts SET is_deleted = 1 WHERE id = 'c1'",
+      );
+
+      // load() should exclude it
+      final loaded = await repo.load();
+      expect(loaded.concepts, isEmpty);
+
+      // But raw query should find it
+      final rawRows = await db.select(db.driftConcepts).get();
+      expect(rawRows.length, 1);
+      expect(rawRows.first.isDeleted, isTrue);
+    });
+
+    test('isDeleted filtering works across all entity types', () async {
+      await repo.save(KnowledgeGraph(
+        concepts: [
+          Concept(
+            id: 'c1',
+            name: 'C',
+            description: 'C',
+            sourceDocumentId: 'doc1',
+          ),
+        ],
+        relationships: const [
+          Relationship(
+            id: 'r1',
+            fromConceptId: 'c1',
+            toConceptId: 'c1',
+            label: 'self',
+          ),
+        ],
+        quizItems: [
+          testQuizItem(id: 'q1', conceptId: 'c1'),
+        ],
+        documentMetadata: [
+          DocumentMetadata(
+            documentId: 'doc1',
+            title: 'Doc',
+            updatedAt: '2026-01-01',
+            ingestedAt: DateTime.utc(2026, 1, 1),
+          ),
+        ],
+      ));
+
+      // Tombstone all rows
+      for (final table in [
+        'drift_concepts',
+        'drift_relationships',
+        'drift_quiz_items',
+        'drift_documents',
+      ]) {
+        await db.customStatement('UPDATE $table SET is_deleted = 1');
+      }
+
+      final loaded = await repo.load();
+      expect(loaded.concepts, isEmpty);
+      expect(loaded.relationships, isEmpty);
+      expect(loaded.quizItems, isEmpty);
+      expect(loaded.documentMetadata, isEmpty);
     });
   });
 }

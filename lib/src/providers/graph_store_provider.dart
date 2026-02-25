@@ -6,6 +6,7 @@ import '../storage/dual_write_graph_repository.dart';
 import '../storage/firestore_graph_repository.dart';
 import '../storage/graph_repository.dart';
 import 'auth_provider.dart';
+import 'hlc_provider.dart';
 
 /// Provides the singleton [EngramDatabase] instance.
 ///
@@ -28,7 +29,8 @@ final engramDatabaseProvider = Provider<EngramDatabase>(
 final graphRepositoryProvider = Provider<GraphRepository>((ref) {
   final user = ref.watch(authStateProvider).valueOrNull;
   final db = ref.watch(engramDatabaseProvider);
-  final driftRepo = DriftGraphRepository(db: db);
+  final hlcManager = ref.watch(hlcManagerProvider);
+  final driftRepo = DriftGraphRepository(db: db, hlcManager: hlcManager);
 
   if (user != null) {
     final firestore = ref.watch(firestoreProvider);
