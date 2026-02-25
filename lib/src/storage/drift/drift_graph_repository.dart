@@ -99,6 +99,9 @@ class DriftGraphRepository extends GraphRepository {
   Future<void> save(KnowledgeGraph graph) async {
     await _db.transaction(() async {
       // 1. Delete all existing data.
+      // TODO(#41): Replace DELETE ALL with upsert + orphan tombstoning in PR 3.
+      // Currently this wipes tombstones — acceptable while save() is the only
+      // write path, but must change before changeset sync is enabled.
       await Future.wait([
         _db.delete(_db.driftTopicDocuments).go(),
         _db.delete(_db.driftTopics).go(),
@@ -112,6 +115,10 @@ class DriftGraphRepository extends GraphRepository {
       //    in case the model layer has duplicate IDs (e.g. cross-document
       //    concept reuse during extraction). Each row is stamped with an
       //    HLC timestamp for CRDT sync.
+      //
+      // A single HLC is used for the entire batch — intentional. All rows
+      // in an atomic save share the same causal timestamp, which is correct
+      // for CRDT semantics (one logical event = one HLC).
       final hlc = _stampHlc();
       await _db.batch((batch) {
         batch.insertAll(
