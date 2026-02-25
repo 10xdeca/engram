@@ -48,5 +48,33 @@ void main() {
       final repo2 = NodeIdRepository(prefs);
       expect(repo2.nodeId, equals(existingId));
     });
+
+    group('ensureInitialized', () {
+      test('generates and persists node ID with awaited write', () async {
+        await repo.ensureInitialized();
+        final nodeId = repo.nodeId;
+        expect(nodeId, isNotEmpty);
+
+        // Verify it was persisted by creating a new instance
+        final prefs = await SharedPreferences.getInstance();
+        final repo2 = NodeIdRepository(prefs);
+        expect(repo2.nodeId, equals(nodeId));
+      });
+
+      test('is idempotent — second call is a no-op', () async {
+        await repo.ensureInitialized();
+        final first = repo.nodeId;
+        await repo.ensureInitialized();
+        expect(repo.nodeId, equals(first));
+      });
+
+      test('nodeId getter returns same value after ensureInitialized', () async {
+        await repo.ensureInitialized();
+        final fromGetter = repo.nodeId;
+        expect(fromGetter, isNotEmpty);
+        // Call again to verify cache consistency
+        expect(repo.nodeId, equals(fromGetter));
+      });
+    });
   });
 }

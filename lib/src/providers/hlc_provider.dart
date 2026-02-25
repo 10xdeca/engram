@@ -7,6 +7,8 @@ import 'settings_provider.dart';
 /// Provides the [NodeIdRepository] for accessing the device's stable node ID.
 ///
 /// Depends on [sharedPreferencesProvider] which must be overridden in `main()`.
+/// Call [NodeIdRepository.ensureInitialized] at startup before reading
+/// [hlcManagerProvider] to guarantee the node ID is durably persisted.
 final nodeIdRepositoryProvider = Provider<NodeIdRepository>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
   return NodeIdRepository(prefs);
