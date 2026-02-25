@@ -1,5 +1,7 @@
+import 'package:crdt/crdt.dart';
 import 'package:drift/drift.dart';
 
+import '../../crdt/graph_changeset.dart';
 import '../../crdt/hlc_manager.dart';
 import '../../models/concept.dart';
 import '../../models/knowledge_graph.dart';
@@ -21,6 +23,11 @@ import 'engram_database.dart';
 /// not present in the incoming graph are soft-deleted (`isDeleted = true`)
 /// rather than physically removed. This preserves tombstones for CRDT
 /// changeset propagation (#41).
+///
+/// **Warning:** [save] tombstones every active row not in the incoming
+/// graph. The sync transport layer (Phase 5) should use [mergeChangeset]
+/// for incoming remote data — never [save] with a partial graph, or it
+/// will tombstone data from other devices.
 ///
 /// When an [HlcManager] is provided, every write is stamped with a
 /// Hybrid Logical Clock timestamp for CRDT sync (#41). Rows with
@@ -413,5 +420,233 @@ class DriftGraphRepository extends GraphRepository {
           ]),
         )
         .asyncMap((_) => load());
+  }
+
+  // -------------------------------------------------------------------------
+  // getChangeset — extract modified rows since an HLC
+  // -------------------------------------------------------------------------
+
+  /// Returns all rows modified after [modifiedAfter] across all tables.
+  ///
+  /// Includes tombstoned rows (`isDeleted = true`) so that deletions
+  /// propagate to other replicas. Pass an empty string to get the full
+  /// state (every row in the database).
+  ///
+  /// Works because HLC strings are lexicographically ordered (ISO 8601
+  /// date prefix + zero-padded hex counter), so `WHERE hlc > ?` is a
+  /// simple string comparison in SQLite, accelerated by the `idx_*_hlc`
+  /// indexes added in schema v3.
+  Future<GraphChangeset> getChangeset({required String modifiedAfter}) async {
+    final results = await Future.wait([
+      (_db.select(_db.driftConcepts)
+            ..where((t) => t.hlc.isBiggerThanValue(modifiedAfter)))
+          .get(),
+      (_db.select(_db.driftRelationships)
+            ..where((t) => t.hlc.isBiggerThanValue(modifiedAfter)))
+          .get(),
+      (_db.select(_db.driftQuizItems)
+            ..where((t) => t.hlc.isBiggerThanValue(modifiedAfter)))
+          .get(),
+      (_db.select(_db.driftDocuments)
+            ..where((t) => t.hlc.isBiggerThanValue(modifiedAfter)))
+          .get(),
+      (_db.select(_db.driftTopics)
+            ..where((t) => t.hlc.isBiggerThanValue(modifiedAfter)))
+          .get(),
+      (_db.select(_db.driftTopicDocuments)
+            ..where((t) => t.hlc.isBiggerThanValue(modifiedAfter)))
+          .get(),
+    ]);
+
+    return GraphChangeset(
+      concepts: results[0] as List<DriftConcept>,
+      relationships: results[1] as List<DriftRelationship>,
+      quizItems: results[2] as List<DriftQuizItem>,
+      documents: results[3] as List<DriftDocument>,
+      topics: results[4] as List<DriftTopic>,
+      topicDocuments: results[5] as List<DriftTopicDocument>,
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // mergeChangeset — apply incoming rows using LWW per HLC
+  // -------------------------------------------------------------------------
+
+  /// Merges an incoming changeset using last-write-wins (LWW) per HLC.
+  ///
+  /// For each incoming row:
+  /// 1. Calls `receive(incoming.hlc)` on the [HlcManager] to advance the
+  ///    local clock (ensures subsequent local writes have causal ordering).
+  /// 2. Looks up the existing row by primary key.
+  /// 3. If no existing row exists, or the incoming HLC is newer: upsert.
+  /// 4. If the incoming HLC is older or equal: skip (idempotent).
+  ///
+  /// Incoming HLCs are **preserved** (not re-stamped) — this is what makes
+  /// merge idempotent. The entire operation runs in a transaction so
+  /// [watch] listeners see a single atomic update.
+  ///
+  /// Returns the number of rows actually written (newer or new rows).
+  ///
+  /// **Performance note:** Currently uses per-row SELECT-then-upsert (N+1
+  /// pattern). At the expected scale (hundreds of rows per sync) this is
+  /// acceptable since each SELECT hits the primary key index. For large
+  /// changesets (1000+ rows), consider batch-SELECTing existing HLCs via
+  /// `WHERE id IN (...)`, comparing in Dart, then batch-INSERTing winners.
+  // TODO(perf): batch SELECT existing HLCs to avoid N+1 pattern
+  Future<int> mergeChangeset(GraphChangeset changeset) async {
+    if (changeset.isEmpty) return 0;
+    final hlcManager = _hlcManager;
+    if (hlcManager == null) {
+      throw StateError('mergeChangeset requires an HlcManager');
+    }
+
+    var written = 0;
+
+    await _db.transaction(() async {
+      // -- Concepts --
+      for (final incoming in changeset.concepts) {
+        if (_isSameNode(incoming.hlc, hlcManager)) continue;
+        _receiveHlc(incoming.hlc, hlcManager);
+        final existing = await (_db.select(_db.driftConcepts)
+              ..where((t) => t.id.equals(incoming.id)))
+            .getSingleOrNull();
+        if (existing == null || incoming.hlc.compareTo(existing.hlc) > 0) {
+          await _db
+              .into(_db.driftConcepts)
+              .insertOnConflictUpdate(incoming.toInsertCompanion());
+          written++;
+        }
+      }
+
+      // -- Relationships --
+      for (final incoming in changeset.relationships) {
+        if (_isSameNode(incoming.hlc, hlcManager)) continue;
+        _receiveHlc(incoming.hlc, hlcManager);
+        final existing = await (_db.select(_db.driftRelationships)
+              ..where((t) => t.id.equals(incoming.id)))
+            .getSingleOrNull();
+        if (existing == null || incoming.hlc.compareTo(existing.hlc) > 0) {
+          await _db
+              .into(_db.driftRelationships)
+              .insertOnConflictUpdate(incoming.toInsertCompanion());
+          written++;
+        }
+      }
+
+      // -- Quiz items --
+      for (final incoming in changeset.quizItems) {
+        if (_isSameNode(incoming.hlc, hlcManager)) continue;
+        _receiveHlc(incoming.hlc, hlcManager);
+        final existing = await (_db.select(_db.driftQuizItems)
+              ..where((t) => t.id.equals(incoming.id)))
+            .getSingleOrNull();
+        if (existing == null || incoming.hlc.compareTo(existing.hlc) > 0) {
+          await _db
+              .into(_db.driftQuizItems)
+              .insertOnConflictUpdate(incoming.toInsertCompanion());
+          written++;
+        }
+      }
+
+      // -- Documents (PK is documentId) --
+      for (final incoming in changeset.documents) {
+        if (_isSameNode(incoming.hlc, hlcManager)) continue;
+        _receiveHlc(incoming.hlc, hlcManager);
+        final existing = await (_db.select(_db.driftDocuments)
+              ..where((t) => t.documentId.equals(incoming.documentId)))
+            .getSingleOrNull();
+        if (existing == null || incoming.hlc.compareTo(existing.hlc) > 0) {
+          await _db
+              .into(_db.driftDocuments)
+              .insertOnConflictUpdate(incoming.toInsertCompanion());
+          written++;
+        }
+      }
+
+      // -- Topics --
+      for (final incoming in changeset.topics) {
+        if (_isSameNode(incoming.hlc, hlcManager)) continue;
+        _receiveHlc(incoming.hlc, hlcManager);
+        final existing = await (_db.select(_db.driftTopics)
+              ..where((t) => t.id.equals(incoming.id)))
+            .getSingleOrNull();
+        if (existing == null || incoming.hlc.compareTo(existing.hlc) > 0) {
+          await _db
+              .into(_db.driftTopics)
+              .insertOnConflictUpdate(incoming.toInsertCompanion());
+          written++;
+        }
+      }
+
+      // -- Topic documents (composite PK: topicId + documentId) --
+      for (final incoming in changeset.topicDocuments) {
+        if (_isSameNode(incoming.hlc, hlcManager)) continue;
+        _receiveHlc(incoming.hlc, hlcManager);
+        final existing = await (_db.select(_db.driftTopicDocuments)
+              ..where(
+                (t) =>
+                    t.topicId.equals(incoming.topicId) &
+                    t.documentId.equals(incoming.documentId),
+              ))
+            .getSingleOrNull();
+        if (existing == null || incoming.hlc.compareTo(existing.hlc) > 0) {
+          await _db
+              .into(_db.driftTopicDocuments)
+              .insertOnConflictUpdate(incoming.toInsertCompanion());
+          written++;
+        }
+      }
+    });
+
+    return written;
+  }
+
+  /// Guards against merging our own HLCs back (would cause
+  /// `DuplicateNodeException` in `Hlc.merge()`).
+  bool _isSameNode(String hlcString, HlcManager hlcManager) {
+    if (hlcString.isEmpty) return false;
+    return hlcString.endsWith(hlcManager.nodeId);
+  }
+
+  /// Advances the local HLC by receiving a remote HLC string.
+  void _receiveHlc(String hlcString, HlcManager hlcManager) {
+    if (hlcString.isEmpty) return;
+    hlcManager.receive(Hlc.parse(hlcString));
+  }
+
+  // -------------------------------------------------------------------------
+  // getLastModified — highest HLC across all tables
+  // -------------------------------------------------------------------------
+
+  /// Returns the highest HLC across all tables, or empty string if the
+  /// database is empty.
+  ///
+  /// Useful for "sync since last known state" bookkeeping — pass the
+  /// result to [getChangeset] on the remote peer.
+  Future<String> getLastModified() async {
+    final results = await Future.wait([
+      _maxHlc('drift_concepts'),
+      _maxHlc('drift_relationships'),
+      _maxHlc('drift_quiz_items'),
+      _maxHlc('drift_documents'),
+      _maxHlc('drift_topics'),
+      _maxHlc('drift_topic_documents'),
+    ]);
+
+    return results.fold<String>('', (best, hlc) {
+      if (hlc.isEmpty) return best;
+      if (best.isEmpty) return hlc;
+      return hlc.compareTo(best) > 0 ? hlc : best;
+    });
+  }
+
+  /// Returns `MAX(hlc)` for a single table, or empty string if the table
+  /// is empty. Uses a raw query since Drift's `max()` aggregate isn't
+  /// available on non-query builders.
+  Future<String> _maxHlc(String tableName) async {
+    final result = await _db.customSelect(
+      'SELECT MAX(hlc) AS max_hlc FROM $tableName',
+    ).getSingle();
+    return (result.data['max_hlc'] as String?) ?? '';
   }
 }

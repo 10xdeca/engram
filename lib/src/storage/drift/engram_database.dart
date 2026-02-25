@@ -19,6 +19,7 @@ part 'engram_database.g.dart';
 /// for CRDT sync (#41). `isDeleted` is a tombstone flag — deleted rows are
 /// hidden from [load] but preserved for changeset propagation.
 @TableIndex(name: 'idx_concepts_source_document', columns: {#sourceDocumentId})
+@TableIndex(name: 'idx_drift_concepts_hlc', columns: {#hlc})
 class DriftConcepts extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
@@ -45,6 +46,7 @@ class DriftConcepts extends Table {
 /// [RelationshipType.inferFromLabel]).
 @TableIndex(name: 'idx_relationships_from', columns: {#fromConceptId})
 @TableIndex(name: 'idx_relationships_to', columns: {#toConceptId})
+@TableIndex(name: 'idx_drift_relationships_hlc', columns: {#hlc})
 class DriftRelationships extends Table {
   TextColumn get id => text()();
   TextColumn get fromConceptId => text()();
@@ -67,6 +69,7 @@ class DriftRelationships extends Table {
 /// though after FSRS Phase 3 all cards should have these fields populated.
 @TableIndex(name: 'idx_quiz_items_concept', columns: {#conceptId})
 @TableIndex(name: 'idx_quiz_items_next_review', columns: {#nextReview})
+@TableIndex(name: 'idx_drift_quiz_items_hlc', columns: {#hlc})
 class DriftQuizItems extends Table {
   TextColumn get id => text()();
   TextColumn get conceptId => text()();
@@ -92,6 +95,7 @@ class DriftQuizItems extends Table {
 ///
 /// `ingestedText` can be large (up to 100K chars) but SQLite handles
 /// TEXT columns of any size without the 1MB Firestore document limit.
+@TableIndex(name: 'idx_drift_documents_hlc', columns: {#hlc})
 class DriftDocuments extends Table {
   TextColumn get documentId => text()();
   TextColumn get title => text()();
@@ -112,6 +116,7 @@ class DriftDocuments extends Table {
 /// The topic's `documentIds` set is normalized into [DriftTopicDocuments]
 /// rather than stored as JSON, since we need to query the relationship
 /// from both directions (topic → documents, document → topics).
+@TableIndex(name: 'idx_drift_topics_hlc', columns: {#hlc})
 class DriftTopics extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
@@ -130,6 +135,7 @@ class DriftTopics extends Table {
 /// Composite primary key (topicId, documentId) ensures uniqueness.
 /// Each row carries its own HLC for CRDT sync — the relationship
 /// itself is an entity that can be created/deleted independently.
+@TableIndex(name: 'idx_drift_topic_documents_hlc', columns: {#hlc})
 class DriftTopicDocuments extends Table {
   TextColumn get topicId => text()();
   TextColumn get documentId => text()();
@@ -138,6 +144,20 @@ class DriftTopicDocuments extends Table {
 
   @override
   Set<Column> get primaryKey => {topicId, documentId};
+}
+
+/// Stores per-peer sync metadata for the CRDT transport layer.
+///
+/// Each row tracks the last HLC we synced with a given peer, so
+/// subsequent syncs only exchange the delta. Populated by the future
+/// transport layer — the table is created now so the schema is ready.
+class DriftSyncMetadata extends Table {
+  TextColumn get peerId => text()();
+  TextColumn get lastSyncedHlc => text()();
+  TextColumn get updatedAt => text()();
+
+  @override
+  Set<Column> get primaryKey => {peerId};
 }
 
 // ---------------------------------------------------------------------------
@@ -159,6 +179,7 @@ class DriftTopicDocuments extends Table {
   DriftDocuments,
   DriftTopics,
   DriftTopicDocuments,
+  DriftSyncMetadata,
 ])
 class EngramDatabase extends _$EngramDatabase {
   EngramDatabase([QueryExecutor? executor])
@@ -168,14 +189,14 @@ class EngramDatabase extends _$EngramDatabase {
   EngramDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) => m.createAll(),
         onUpgrade: (m, from, to) async {
           if (from < 2) {
-            // Add is_deleted column with default false to all 6 tables.
+            // v1 → v2: Add is_deleted column with default false to all 6 tables.
             for (final table in [
               'drift_concepts',
               'drift_relationships',
@@ -189,6 +210,30 @@ class EngramDatabase extends _$EngramDatabase {
                 'NOT NULL DEFAULT 0',
               );
             }
+          }
+          if (from < 3) {
+            // v2 → v3: Add HLC indexes for efficient changeset queries
+            // (`WHERE hlc > ?`) and create sync metadata table.
+            for (final table in [
+              'drift_concepts',
+              'drift_relationships',
+              'drift_quiz_items',
+              'drift_documents',
+              'drift_topics',
+              'drift_topic_documents',
+            ]) {
+              await m.database.customStatement(
+                'CREATE INDEX IF NOT EXISTS idx_${table}_hlc '
+                'ON $table (hlc)',
+              );
+            }
+            await m.database.customStatement(
+              'CREATE TABLE IF NOT EXISTS drift_sync_metadata ('
+              'peer_id TEXT NOT NULL PRIMARY KEY, '
+              'last_synced_hlc TEXT NOT NULL, '
+              'updated_at TEXT NOT NULL'
+              ')',
+            );
           }
         },
       );

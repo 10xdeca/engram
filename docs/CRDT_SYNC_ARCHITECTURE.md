@@ -205,26 +205,48 @@ PowerSync provides a complete local-first sync layer for Flutter:
 
 ## Migration Strategy
 
-### Phase 1: Dual-Write Foundation
+### Phase 1: Dual-Write Foundation ✅
 
 - Add Drift/SQLite as a parallel storage backend
 - Write to both Drift and Firestore on every operation
 - Read from Drift (local-primary)
 - Verify consistency between both stores
 
-### Phase 2: CRDT Timestamps
+### Phase 2: HLC Timestamps + Tombstones ✅
 
-- Add HLC columns to all Drift tables
-- Start recording timestamps on every write
-- Build changeset generation (`getChangeset(since: hlc)`)
+- Add `hlc` and `is_deleted` columns to all 6 Drift tables
+- `HlcManager` stamps every write with a monotonic HLC
+- `purgeTombstones()` for garbage collection after sync confirmation
 
-### Phase 3: Sync Layer
+### Phase 3: Upsert + Orphan Tombstoning ✅
 
-- Implement merge logic (per CRDT type mapping above)
-- Build background sync service (push changesets to server, pull from server)
+- `save()` uses INSERT OR REPLACE (upserts) + orphan soft-deletion
+- Active rows not in incoming graph are tombstoned, not physically deleted
+- Tombstones preserved for changeset propagation
+
+### Phase 4: Changeset Generation & Merge ✅
+
+- Schema v3: HLC indexes on all 6 tables, `drift_sync_metadata` table
+- `GraphChangeset` data class: typed Drift rows internally, JSON wire format
+  (table name → list of column maps, compatible with `package:crdt`'s
+  `CrdtChangeset` typedef)
+- `getChangeset(modifiedAfter:)`: extract modified rows since an HLC, includes
+  tombstones for deletion propagation
+- `mergeChangeset()`: LWW per HLC, `receive()` advances local clock for causal
+  ordering, idempotent, atomic (transaction), fires `watch()` listeners
+- `getLastModified()`: highest HLC across all tables for sync bookkeeping
+- `toInsertCompanion()` reverse mappers on all 6 Drift data classes
+- Same-node guard prevents `DuplicateNodeException` from `Hlc.merge()`
+- Row-level LWW (sufficient for single-user multi-device sync; per-field LWW
+  deferred to social knowledge layer — see `docs/SOCIAL_KNOWLEDGE_PLAN.md`)
+
+### Phase 5: Sync Transport Layer (next)
+
+- Background sync service (push/pull changesets over network)
+- Populate `drift_sync_metadata` with per-peer last-synced HLC
 - Server-side merge in Firestore (or migrate to Postgres)
 
-### Phase 4: Firestore Optional
+### Phase 6: Firestore Optional
 
 - Personal features work entirely offline with Drift
 - Firestore (or replacement) used only for social sync + backup
