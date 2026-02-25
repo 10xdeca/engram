@@ -1,6 +1,4 @@
-import 'dart:convert';
-import 'dart:io';
-
+import 'package:drift/native.dart';
 import 'package:engram/src/models/concept.dart';
 import 'package:engram/src/models/document_metadata.dart';
 import 'package:engram/src/models/knowledge_graph.dart';
@@ -9,44 +7,39 @@ import 'package:engram/src/models/relationship.dart';
 import 'package:engram/src/models/topic.dart';
 import 'package:engram/src/providers/graph_store_provider.dart';
 import 'package:engram/src/providers/knowledge_graph_provider.dart';
-import 'package:engram/src/providers/settings_provider.dart';
-import 'package:engram/src/storage/config.dart';
-import 'package:engram/src/storage/local_graph_repository.dart';
+import 'package:engram/src/storage/drift/drift_graph_repository.dart';
+import 'package:engram/src/storage/drift/engram_database.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:test/test.dart';
 
 void main() {
-  late Directory tempDir;
-  late LocalGraphRepository store;
+  late EngramDatabase db;
+  late DriftGraphRepository repo;
 
   setUp(() {
-    tempDir = Directory.systemTemp.createTempSync('engram_provider_test_');
-    store = LocalGraphRepository(dataDir: tempDir.path);
+    db = EngramDatabase.forTesting(NativeDatabase.memory());
+    repo = DriftGraphRepository(db: db);
   });
 
-  tearDown(() {
-    tempDir.deleteSync(recursive: true);
+  tearDown(() async {
+    await db.close();
   });
 
-  ProviderContainer createContainer({KnowledgeGraph? initial}) {
+  Future<ProviderContainer> createContainer({KnowledgeGraph? initial}) async {
     if (initial != null) {
-      final json = const JsonEncoder.withIndent('  ').convert(initial.toJson());
-      File('${tempDir.path}/knowledge_graph.json').writeAsStringSync(json);
+      await repo.save(initial);
     }
 
-    return ProviderContainer(
-      overrides: [
-        settingsProvider.overrideWith(
-          () => _FakeSettingsNotifier(tempDir.path),
-        ),
-        graphRepositoryProvider.overrideWithValue(store),
-      ],
+    final container = ProviderContainer(
+      overrides: [graphRepositoryProvider.overrideWithValue(repo)],
     );
+    addTearDown(container.dispose);
+    return container;
   }
 
   group('KnowledgeGraphNotifier', () {
     test('build loads empty graph when no file exists', () async {
-      final container = createContainer();
+      final container = await createContainer();
       final graph = await container.read(knowledgeGraphProvider.future);
       expect(graph.concepts, isEmpty);
       expect(graph.quizItems, isEmpty);
@@ -63,7 +56,7 @@ void main() {
           ),
         ],
       );
-      final container = createContainer(initial: graph);
+      final container = await createContainer(initial: graph);
       final loaded = await container.read(knowledgeGraphProvider.future);
       expect(loaded.concepts, hasLength(1));
       expect(loaded.concepts.first.id, 'c1');
@@ -77,7 +70,7 @@ void main() {
         answer: 'That.',
       );
       final graph = KnowledgeGraph(quizItems: [item]);
-      final container = createContainer(initial: graph);
+      final container = await createContainer(initial: graph);
 
       await container.read(knowledgeGraphProvider.future);
 
@@ -96,8 +89,8 @@ void main() {
       final newGraph = await container.read(knowledgeGraphProvider.future);
       expect(newGraph.quizItems.first.fsrsState, 2);
 
-      // Verify persisted to disk
-      final reloaded = await store.load();
+      // Verify persisted to database
+      final reloaded = await repo.load();
       expect(reloaded.quizItems.first.fsrsState, 2);
     });
 
@@ -152,7 +145,7 @@ void main() {
         // No topics — triggers auto-migration
       );
 
-      final container = createContainer(initial: graph);
+      final container = await createContainer(initial: graph);
       final loaded = await container.read(knowledgeGraphProvider.future);
 
       // Should have 2 auto-generated topics (one per collection)
@@ -191,7 +184,7 @@ void main() {
         ],
       );
 
-      final container = createContainer(initial: graph);
+      final container = await createContainer(initial: graph);
       final loaded = await container.read(knowledgeGraphProvider.future);
 
       // Should keep the existing topic and NOT add auto-migrated ones
@@ -220,7 +213,7 @@ void main() {
         ],
       );
 
-      final container = createContainer(initial: graph);
+      final container = await createContainer(initial: graph);
       final loaded = await container.read(knowledgeGraphProvider.future);
 
       // Only one topic for the metadata with a collectionId
@@ -230,7 +223,7 @@ void main() {
     });
 
     test('ingestExtraction adds concepts and persists', () async {
-      final container = createContainer();
+      final container = await createContainer();
       await container.read(knowledgeGraphProvider.future);
 
       final result = ExtractionResult(
@@ -274,16 +267,8 @@ void main() {
       expect(graph.documentMetadata, hasLength(1));
 
       // Verify persisted
-      final reloaded = await store.load();
+      final reloaded = await repo.load();
       expect(reloaded.concepts, hasLength(1));
     });
   });
-}
-
-class _FakeSettingsNotifier extends SettingsNotifier {
-  _FakeSettingsNotifier(this._dataDir);
-  final String _dataDir;
-
-  @override
-  EngramConfig build() => EngramConfig(dataDir: _dataDir);
 }

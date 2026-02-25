@@ -1,6 +1,4 @@
-import 'dart:convert';
-import 'dart:io';
-
+import 'package:drift/native.dart';
 import 'package:engram/src/engine/fsrs_engine.dart';
 import 'package:engram/src/models/concept.dart';
 import 'package:engram/src/models/knowledge_graph.dart';
@@ -11,23 +9,23 @@ import 'package:engram/src/providers/graph_store_provider.dart';
 import 'package:engram/src/providers/knowledge_graph_provider.dart';
 import 'package:engram/src/providers/quiz_session_provider.dart';
 import 'package:engram/src/providers/settings_provider.dart';
-import 'package:engram/src/storage/config.dart';
-import 'package:engram/src/storage/local_graph_repository.dart';
+import 'package:engram/src/storage/drift/drift_graph_repository.dart';
+import 'package:engram/src/storage/drift/engram_database.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test/test.dart';
 
 void main() {
-  late Directory tempDir;
-  late LocalGraphRepository store;
+  late EngramDatabase db;
+  late DriftGraphRepository repo;
 
   setUp(() {
-    tempDir = Directory.systemTemp.createTempSync('engram_quiz_test_');
-    store = LocalGraphRepository(dataDir: tempDir.path);
+    db = EngramDatabase.forTesting(NativeDatabase.memory());
+    repo = DriftGraphRepository(db: db);
   });
 
-  tearDown(() {
-    tempDir.deleteSync(recursive: true);
+  tearDown(() async {
+    await db.close();
   });
 
   KnowledgeGraph graphWithDueItems(int count) {
@@ -59,18 +57,14 @@ void main() {
     KnowledgeGraph graph, {
     Map<String, Object> prefsValues = const {},
   }) async {
-    final json = const JsonEncoder.withIndent('  ').convert(graph.toJson());
-    File('${tempDir.path}/knowledge_graph.json').writeAsStringSync(json);
+    await repo.save(graph);
 
     SharedPreferences.setMockInitialValues(prefsValues);
     final prefs = await SharedPreferences.getInstance();
 
     final container = ProviderContainer(
       overrides: [
-        settingsProvider.overrideWith(
-          () => _FakeSettingsNotifier(tempDir.path),
-        ),
-        graphRepositoryProvider.overrideWithValue(store),
+        graphRepositoryProvider.overrideWithValue(repo),
         sharedPreferencesProvider.overrideWithValue(prefs),
       ],
     );
@@ -389,12 +383,4 @@ void main() {
       expect(state.correctCount, 2);
     });
   });
-}
-
-class _FakeSettingsNotifier extends SettingsNotifier {
-  _FakeSettingsNotifier(this._dataDir);
-  final String _dataDir;
-
-  @override
-  EngramConfig build() => EngramConfig(dataDir: _dataDir);
 }

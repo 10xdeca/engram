@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:io';
 
+import 'package:drift/native.dart';
 import 'package:engram/src/engine/fsrs_engine.dart';
 import 'package:engram/src/engine/graph_analyzer.dart';
 import 'package:engram/src/engine/scheduler.dart';
@@ -21,7 +21,8 @@ import 'package:engram/src/models/quiz_session_state.dart';
 import 'package:engram/src/services/extraction_service.dart';
 import 'package:engram/src/services/outline_client.dart';
 import 'package:engram/src/storage/config.dart';
-import 'package:engram/src/storage/local_graph_repository.dart';
+import 'package:engram/src/storage/drift/drift_graph_repository.dart';
+import 'package:engram/src/storage/drift/engram_database.dart';
 import 'package:engram/src/storage/settings_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
@@ -137,14 +138,14 @@ KnowledgeGraph buildDependencyGraph({
 
 void main() {
   group('Living system integration', () {
-    late Directory tempDir;
-    late LocalGraphRepository store;
+    late EngramDatabase db;
+    late DriftGraphRepository repo;
     late SharedPreferences prefs;
     late SettingsRepository settingsRepo;
 
     setUp(() async {
-      tempDir = Directory.systemTemp.createTempSync('engram_integration_');
-      store = LocalGraphRepository(dataDir: tempDir.path);
+      db = EngramDatabase.forTesting(NativeDatabase.memory());
+      repo = DriftGraphRepository(db: db);
       SharedPreferences.setMockInitialValues({
         'outline_api_url': 'https://wiki.test.com',
         'outline_api_key': 'test-key',
@@ -155,24 +156,23 @@ void main() {
       settingsRepo = SettingsRepository(prefs);
     });
 
-    tearDown(() {
-      tempDir.deleteSync(recursive: true);
+    tearDown(() async {
+      await db.close();
     });
 
-    ProviderContainer createContainer(
+    Future<ProviderContainer> createContainer(
       KnowledgeGraph graph, {
       http.Client? httpClient,
       ExtractionService? extraction,
-    }) {
-      final json = const JsonEncoder.withIndent('  ').convert(graph.toJson());
-      File('${tempDir.path}/knowledge_graph.json').writeAsStringSync(json);
+    }) async {
+      await repo.save(graph);
 
-      return ProviderContainer(
+      final container = ProviderContainer(
         overrides: [
           settingsProvider.overrideWith(
-            () => _FakeSettingsNotifier(tempDir.path),
+            () => _FakeSettingsNotifier(),
           ),
-          graphRepositoryProvider.overrideWithValue(store),
+          graphRepositoryProvider.overrideWithValue(repo),
           sharedPreferencesProvider.overrideWithValue(prefs),
           settingsRepositoryProvider.overrideWithValue(settingsRepo),
           if (httpClient != null)
@@ -187,13 +187,15 @@ void main() {
             extractionServiceProvider.overrideWithValue(extraction),
         ],
       );
+      addTearDown(container.dispose);
+      return container;
     }
 
     test(
       'dependency chain: only foundational concepts are schedulable initially',
       () async {
         final graph = buildDependencyGraph();
-        final container = createContainer(graph);
+        final container = await createContainer(graph);
         await container.read(knowledgeGraphProvider.future);
 
         final stats = container.read(dashboardStatsProvider);
@@ -216,7 +218,7 @@ void main() {
     test('mastering a concept unlocks its dependents', () async {
       // Docker already mastered (fsrsState=2), so Kubernetes should unlock
       final graph = buildDependencyGraph(dockerMastered: true);
-      final container = createContainer(graph);
+      final container = await createContainer(graph);
       await container.read(knowledgeGraphProvider.future);
 
       final stats = container.read(dashboardStatsProvider);
@@ -237,7 +239,7 @@ void main() {
 
     test('quiz session updates FSRS state and persists to graph', () async {
       final graph = buildDependencyGraph();
-      final container = createContainer(graph);
+      final container = await createContainer(graph);
       await container.read(knowledgeGraphProvider.future);
 
       // Start a quiz session — only Docker should appear
@@ -268,7 +270,7 @@ void main() {
 
     test('dashboard stats recompute after quiz completes', () async {
       final graph = buildDependencyGraph();
-      final container = createContainer(graph);
+      final container = await createContainer(graph);
       await container.read(knowledgeGraphProvider.future);
 
       final statsBefore = container.read(dashboardStatsProvider);
@@ -308,7 +310,7 @@ void main() {
 
     test('full flow: quiz mastery cascades through dependency chain', () async {
       final graph = buildDependencyGraph();
-      final container = createContainer(graph);
+      final container = await createContainer(graph);
       await container.read(knowledgeGraphProvider.future);
 
       // Phase 1: Only Docker is due
@@ -385,7 +387,7 @@ void main() {
         return http.Response('{}', 200);
       });
 
-      final container = createContainer(
+      final container = await createContainer(
         graph,
         httpClient: client,
         extraction: mockExtraction,
@@ -401,12 +403,8 @@ void main() {
 }
 
 class _FakeSettingsNotifier extends SettingsNotifier {
-  _FakeSettingsNotifier(this._dataDir);
-  final String _dataDir;
-
   @override
-  EngramConfig build() => EngramConfig(
-    dataDir: _dataDir,
+  EngramConfig build() => const EngramConfig(
     outlineApiUrl: 'https://wiki.test.com',
     outlineApiKey: 'test-key',
     anthropicApiKey: 'sk-ant-test',
