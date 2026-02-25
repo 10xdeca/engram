@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:ui';
+
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -50,7 +53,9 @@ class IngestScreen extends ConsumerWidget {
                 IngestPhase.loadingCollections => const Center(
                   child: CircularProgressIndicator(),
                 ),
-                IngestPhase.ready => _CollectionPicker(state: ingest),
+                IngestPhase.ready => _TopicSelectionView(
+                  state: ingest,
+                ),
                 IngestPhase.topicSelection => _TopicSelectionView(
                   state: ingest,
                 ),
@@ -158,20 +163,6 @@ class _TopicSelectionView extends ConsumerWidget {
                 final topic = topics[index];
                 return _TopicTile(topic: topic);
               },
-            ),
-          ),
-        // Legacy collection picker button
-        if (state.collections.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: OutlinedButton.icon(
-              onPressed: () {
-                ref
-                    .read(ingestProvider.notifier)
-                    .selectCollection(state.collections.first);
-              },
-              icon: const Icon(Icons.folder_outlined),
-              label: const Text('Single Collection (Legacy)'),
             ),
           ),
         const SizedBox(height: 8),
@@ -454,90 +445,59 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
-/// Legacy collection picker — kept for backward compatibility.
-class _CollectionPicker extends ConsumerWidget {
-  const _CollectionPicker({required this.state});
-  final IngestState state;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Text(
-            'Select a collection',
-            style: theme.textTheme.titleMedium,
-          ),
-        ),
-        Expanded(
-          child: ListView.builder(
-            itemCount: state.collections.length,
-            itemBuilder: (context, index) {
-              final collection = state.collections[index];
-              final name = collection['name'] as String? ?? 'Untitled';
-              final isSelected =
-                  state.selectedCollection?['id'] == collection['id'];
-
-              return ListTile(
-                title: Text(name),
-                leading: Icon(
-                  isSelected
-                      ? Icons.radio_button_checked
-                      : Icons.radio_button_off,
-                  color: isSelected ? theme.colorScheme.primary : null,
-                ),
-                onTap:
-                    () => ref
-                        .read(ingestProvider.notifier)
-                        .selectCollection(collection),
-              );
-            },
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Expanded(
-                child: FilledButton(
-                  onPressed:
-                      state.selectedCollection != null
-                          ? () =>
-                              ref.read(ingestProvider.notifier).startIngestion()
-                          : null,
-                  child: const Text('Start Ingestion'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed:
-                      state.selectedCollection != null
-                          ? () => ref
-                              .read(ingestProvider.notifier)
-                              .startIngestion(forceReExtract: true)
-                          : null,
-                  child: const Text('Re-extract All'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ProgressView extends ConsumerWidget {
+class _ProgressView extends ConsumerStatefulWidget {
   const _ProgressView({required this.state});
   final IngestState state;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ProgressView> createState() => _ProgressViewState();
+}
+
+class _ProgressViewState extends ConsumerState<_ProgressView> {
+  final _stopwatch = Stopwatch();
+  Timer? _timer;
+  String _lastDocTitle = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _stopwatch.start();
+    // Tick every second to update elapsed time display.
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _stopwatch.stop();
+    super.dispose();
+  }
+
+  /// Reset the stopwatch when we move to a new document.
+  void _checkDocumentChange() {
+    final title = widget.state.currentDocumentTitle;
+    if (title != _lastDocTitle) {
+      _lastDocTitle = title;
+      _stopwatch.reset();
+      _stopwatch.start();
+    }
+  }
+
+  String _formatElapsed() {
+    final seconds = _stopwatch.elapsed.inSeconds;
+    if (seconds < 60) return '${seconds}s';
+    final m = seconds ~/ 60;
+    final s = seconds % 60;
+    return '${m}m ${s.toString().padLeft(2, '0')}s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _checkDocumentChange();
+
+    final state = widget.state;
     final theme = Theme.of(context);
     final fullGraph = ref.watch(knowledgeGraphProvider).valueOrNull;
     final sessionIds = state.sessionConceptIds;
@@ -545,21 +505,10 @@ class _ProgressView extends ConsumerWidget {
     // Filter to only show concepts extracted in this session.
     final graph =
         fullGraph != null && sessionIds.isNotEmpty
-            ? KnowledgeGraph(
-              concepts:
-                  fullGraph.concepts
-                      .where((c) => sessionIds.contains(c.id))
-                      .toList(),
-              relationships:
-                  fullGraph.relationships
-                      .where(
-                        (r) =>
-                            sessionIds.contains(r.fromConceptId) &&
-                            sessionIds.contains(r.toConceptId),
-                      )
-                      .toList(),
-            )
+            ? _filterByConceptIds(fullGraph, sessionIds)
             : null;
+
+    final hasGraph = graph != null && graph.concepts.isNotEmpty;
 
     return Column(
       children: [
@@ -573,7 +522,7 @@ class _ProgressView extends ConsumerWidget {
             ),
           ),
         // Live graph — grows as concepts are extracted
-        if (graph != null && graph.concepts.isNotEmpty)
+        if (hasGraph)
           Expanded(
             child: LayoutBuilder(
               builder:
@@ -585,7 +534,48 @@ class _ProgressView extends ConsumerWidget {
             ),
           )
         else
-          const Expanded(child: SizedBox.shrink()),
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 64,
+                    height: 64,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
+                      color: theme.colorScheme.primary.withAlpha(128),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (state.currentDocumentTitle.isNotEmpty) ...[
+                    Text(
+                      state.currentDocumentTitle,
+                      style: theme.textTheme.titleSmall,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  if (state.statusMessage.isNotEmpty)
+                    Text(
+                      state.statusMessage,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _formatElapsed(),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         // Progress info at the bottom
         Padding(
           padding: const EdgeInsets.all(24),
@@ -599,23 +589,6 @@ class _ProgressView extends ConsumerWidget {
                 style: theme.textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
-              if (state.currentDocumentTitle.isNotEmpty)
-                Text(
-                  state.currentDocumentTitle,
-                  style: theme.textTheme.bodyMedium,
-                  textAlign: TextAlign.center,
-                ),
-              if (state.statusMessage.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  state.statusMessage,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-              const SizedBox(height: 8),
               Text(
                 '${state.extractedCount} extracted, ${state.skippedCount} skipped',
                 style: theme.textTheme.bodySmall,
@@ -628,6 +601,12 @@ class _ProgressView extends ConsumerWidget {
   }
 }
 
+/// Shows the session graph after ingestion completes, with summary info
+/// overlaid at the bottom. The graph stays visible until the user taps "Done".
+///
+/// When new concepts were extracted, shows the session graph (new concepts
+/// only). When all documents were skipped, falls back to showing the full
+/// topic graph so the screen isn't blank.
 class _DoneView extends ConsumerWidget {
   const _DoneView({required this.state});
   final IngestState state;
@@ -635,31 +614,115 @@ class _DoneView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final fullGraph = ref.watch(knowledgeGraphProvider).valueOrNull;
+    final sessionIds = state.sessionConceptIds;
+    final topic = state.selectedTopic;
 
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.check_circle, size: 64, color: Colors.green.shade600),
-          const SizedBox(height: 16),
-          Text('Ingestion Complete', style: theme.textTheme.headlineSmall),
-          if (state.selectedTopic != null) ...[
-            const SizedBox(height: 8),
-            Text(state.selectedTopic!.name, style: theme.textTheme.titleMedium),
-          ],
-          const SizedBox(height: 8),
-          Text(
-            '${state.extractedCount} extracted, ${state.skippedCount} skipped',
+    // Prefer session graph (newly extracted concepts). Fall back to the
+    // full topic graph when everything was skipped (0 extracted).
+    KnowledgeGraph? graph;
+    if (fullGraph != null) {
+      if (sessionIds.isNotEmpty) {
+        graph = _filterByConceptIds(fullGraph, sessionIds);
+      } else if (topic != null) {
+        // Show all concepts belonging to documents in this topic.
+        final topicDocIds = topic.documentIds;
+        final topicConceptIds =
+            fullGraph.concepts
+                .where((c) => topicDocIds.contains(c.sourceDocumentId))
+                .map((c) => c.id)
+                .toSet();
+        graph = _filterByConceptIds(fullGraph, topicConceptIds);
+      }
+    }
+
+    final hasGraph = graph != null && graph.concepts.isNotEmpty;
+    final conceptCount = hasGraph ? graph.concepts.length : 0;
+
+    return Column(
+      children: [
+        // Session/topic graph — interactive, stays visible for exploration
+        if (hasGraph)
+          Expanded(
+            child: LayoutBuilder(
+              builder:
+                  (context, constraints) => ForceDirectedGraphWidget(
+                    graph: graph!,
+                    layoutWidth: constraints.maxWidth,
+                    layoutHeight: constraints.maxHeight,
+                  ),
+            ),
+          )
+        else
+          const Expanded(child: SizedBox.shrink()),
+        // Summary bar at the bottom
+        Container(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            border: Border(
+              top: BorderSide(color: theme.colorScheme.outlineVariant),
+            ),
           ),
-          const SizedBox(height: 24),
-          FilledButton(
-            onPressed: () => ref.read(ingestProvider.notifier).reset(),
-            child: const Text('Done'),
+          child: Row(
+            children: [
+              Icon(
+                Icons.check_circle,
+                color: Colors.green.shade600,
+                size: 28,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Ingestion Complete',
+                      style: theme.textTheme.titleSmall,
+                    ),
+                    Text(
+                      '${state.extractedCount} extracted, '
+                      '${state.skippedCount} skipped'
+                      '${conceptCount > 0 ? ' — $conceptCount concepts' : ''}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              FilledButton(
+                onPressed: () => ref.read(ingestProvider.notifier).reset(),
+                child: const Text('Done'),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
+}
+
+/// Filters a [KnowledgeGraph] to only include concepts in [conceptIds]
+/// and relationships connecting those concepts.
+KnowledgeGraph _filterByConceptIds(
+  KnowledgeGraph fullGraph,
+  Iterable<String> conceptIds,
+) {
+  final ids = conceptIds is Set<String> ? conceptIds : conceptIds.toSet();
+  if (ids.isEmpty) return KnowledgeGraph();
+  return KnowledgeGraph(
+    concepts: fullGraph.concepts.where((c) => ids.contains(c.id)).toList(),
+    relationships:
+        fullGraph.relationships
+            .where(
+              (r) =>
+                  ids.contains(r.fromConceptId) &&
+                  ids.contains(r.toConceptId),
+            )
+            .toList(),
+  );
 }
 
 class _ErrorView extends ConsumerWidget {

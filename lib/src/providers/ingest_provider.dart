@@ -331,11 +331,11 @@ class IngestNotifier extends Notifier<IngestState> {
               predictionAccuracy: predictionAccuracy,
             )
             .timeout(
-              const Duration(minutes: 3),
+              _extractionTimeout(content.length),
               onTimeout:
                   () =>
                       throw TimeoutException(
-                        'Claude extraction timed out after 3 min for "$docTitle"',
+                        'Claude extraction timed out for "$docTitle"',
                       ),
             );
         debugPrint(
@@ -557,11 +557,11 @@ class IngestNotifier extends Notifier<IngestState> {
               predictionAccuracy: predictionAccuracy,
             )
             .timeout(
-              const Duration(minutes: 3),
+              _extractionTimeout(content.length),
               onTimeout:
                   () =>
                       throw TimeoutException(
-                        'Claude extraction timed out after 3 min for "$docTitle"',
+                        'Claude extraction timed out for "$docTitle"',
                       ),
             );
         debugPrint(
@@ -650,6 +650,17 @@ class IngestNotifier extends Notifier<IngestState> {
         errorMessage: 'Ingestion failed: $e',
       );
     }
+  }
+
+  /// Scales the extraction timeout based on document size.
+  ///
+  /// Base of 3 minutes plus 1 minute per 10K characters, capped at 8 minutes.
+  /// Large documents produce more concepts/relationships/quiz items, so Claude
+  /// needs proportionally more output tokens (and thus more time).
+  static Duration _extractionTimeout(int contentLength) {
+    final extraMinutes = (contentLength / 10000).ceil();
+    final totalMinutes = (3 + extraMinutes).clamp(3, 8);
+    return Duration(minutes: totalMinutes);
   }
 
   /// Auto-split quiz items with `predictedDifficulty > 8` into sub-concepts.
