@@ -22,7 +22,8 @@ List<TimestampedConcept> mapMarkersToTimestamps({
     return const [];
   }
 
-  final maxIndex = characterStartTimes.length - 1;
+  final maxIndex =
+      math.min(characterStartTimes.length, characterEndTimes.length) - 1;
 
   return [
     for (final marker in markers)
