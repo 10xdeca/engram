@@ -48,6 +48,25 @@ extension DriftConceptToDomain on DriftConcept {
       parentConceptId: parentConceptId,
     );
   }
+
+  /// Produces a companion that preserves all columns including `hlc` and
+  /// `isDeleted`. Used by [mergeChangeset] to re-insert incoming rows
+  /// with their original HLC timestamps (not re-stamped).
+  DriftConceptsCompanion toInsertCompanion() => DriftConceptsCompanion.insert(
+        id: id,
+        name: name,
+        description: description,
+        sourceDocumentId: sourceDocumentId,
+        tags: tags,
+        parentConceptId:
+            parentConceptId != null
+                ? Value(parentConceptId)
+                : const Value.absent(),
+        embedding:
+            embedding != null ? Value(embedding) : const Value.absent(),
+        hlc: Value(hlc),
+        isDeleted: Value(isDeleted),
+      );
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +107,21 @@ extension DriftRelationshipToDomain on DriftRelationship {
       type: type,
     );
   }
+
+  /// Produces a companion preserving all columns including `hlc` and
+  /// `isDeleted` for CRDT merge.
+  DriftRelationshipsCompanion toInsertCompanion() =>
+      DriftRelationshipsCompanion.insert(
+        id: id,
+        fromConceptId: fromConceptId,
+        toConceptId: toConceptId,
+        label: label,
+        description:
+            description != null ? Value(description) : const Value.absent(),
+        type: type,
+        hlc: Value(hlc),
+        isDeleted: Value(isDeleted),
+      );
 }
 
 // ---------------------------------------------------------------------------
@@ -151,6 +185,33 @@ extension DriftQuizItemToDomain on DriftQuizItem {
       reviewCount: reviewCount,
     );
   }
+
+  /// Produces a companion preserving all columns including `hlc` and
+  /// `isDeleted` for CRDT merge.
+  DriftQuizItemsCompanion toInsertCompanion() => DriftQuizItemsCompanion.insert(
+        id: id,
+        conceptId: conceptId,
+        question: question,
+        answer: answer,
+        interval: interval,
+        nextReview: nextReview,
+        lastReview:
+            lastReview != null ? Value(lastReview) : const Value.absent(),
+        difficulty:
+            difficulty != null ? Value(difficulty) : const Value.absent(),
+        stability:
+            stability != null ? Value(stability) : const Value.absent(),
+        fsrsState:
+            fsrsState != null ? Value(fsrsState) : const Value.absent(),
+        lapses: lapses != null ? Value(lapses) : const Value.absent(),
+        predictedDifficulty:
+            predictedDifficulty != null
+                ? Value(predictedDifficulty)
+                : const Value.absent(),
+        reviewCount: Value(reviewCount),
+        hlc: Value(hlc),
+        isDeleted: Value(isDeleted),
+      );
 }
 
 // ---------------------------------------------------------------------------
@@ -195,6 +256,25 @@ extension DriftDocumentToDomain on DriftDocument {
       ingestedText: ingestedText,
     );
   }
+
+  /// Produces a companion preserving all columns including `hlc` and
+  /// `isDeleted` for CRDT merge.
+  DriftDocumentsCompanion toInsertCompanion() => DriftDocumentsCompanion.insert(
+        documentId: documentId,
+        title: title,
+        updatedAt: updatedAt,
+        ingestedAt: ingestedAt,
+        collectionId:
+            collectionId != null ? Value(collectionId) : const Value.absent(),
+        collectionName:
+            collectionName != null
+                ? Value(collectionName)
+                : const Value.absent(),
+        ingestedText:
+            ingestedText != null ? Value(ingestedText) : const Value.absent(),
+        hlc: Value(hlc),
+        isDeleted: Value(isDeleted),
+      );
 }
 
 // ---------------------------------------------------------------------------
@@ -239,4 +319,32 @@ extension DriftTopicToDomain on DriftTopic {
           lastIngestedAt != null ? DateTime.parse(lastIngestedAt!) : null,
     );
   }
+
+  /// Produces a companion preserving all columns including `hlc` and
+  /// `isDeleted` for CRDT merge.
+  DriftTopicsCompanion toInsertCompanion() => DriftTopicsCompanion.insert(
+        id: id,
+        name: name,
+        description:
+            description != null ? Value(description) : const Value.absent(),
+        createdAt: createdAt,
+        lastIngestedAt:
+            lastIngestedAt != null
+                ? Value(lastIngestedAt)
+                : const Value.absent(),
+        hlc: Value(hlc),
+        isDeleted: Value(isDeleted),
+      );
+}
+
+/// Produces a companion preserving all columns including `hlc` and
+/// `isDeleted` for CRDT merge.
+extension DriftTopicDocumentToInsertCompanion on DriftTopicDocument {
+  DriftTopicDocumentsCompanion toInsertCompanion() =>
+      DriftTopicDocumentsCompanion.insert(
+        topicId: topicId,
+        documentId: documentId,
+        hlc: Value(hlc),
+        isDeleted: Value(isDeleted),
+      );
 }

@@ -3386,6 +3386,284 @@ class DriftTopicDocumentsCompanion extends UpdateCompanion<DriftTopicDocument> {
   }
 }
 
+class $DriftSyncMetadataTable extends DriftSyncMetadata
+    with TableInfo<$DriftSyncMetadataTable, DriftSyncMetadataData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DriftSyncMetadataTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _peerIdMeta = const VerificationMeta('peerId');
+  @override
+  late final GeneratedColumn<String> peerId = GeneratedColumn<String>(
+    'peer_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lastSyncedHlcMeta = const VerificationMeta(
+    'lastSyncedHlc',
+  );
+  @override
+  late final GeneratedColumn<String> lastSyncedHlc = GeneratedColumn<String>(
+    'last_synced_hlc',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<String> updatedAt = GeneratedColumn<String>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [peerId, lastSyncedHlc, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'drift_sync_metadata';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DriftSyncMetadataData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('peer_id')) {
+      context.handle(
+        _peerIdMeta,
+        peerId.isAcceptableOrUnknown(data['peer_id']!, _peerIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_peerIdMeta);
+    }
+    if (data.containsKey('last_synced_hlc')) {
+      context.handle(
+        _lastSyncedHlcMeta,
+        lastSyncedHlc.isAcceptableOrUnknown(
+          data['last_synced_hlc']!,
+          _lastSyncedHlcMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_lastSyncedHlcMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {peerId};
+  @override
+  DriftSyncMetadataData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DriftSyncMetadataData(
+      peerId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}peer_id'],
+          )!,
+      lastSyncedHlc:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}last_synced_hlc'],
+          )!,
+      updatedAt:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}updated_at'],
+          )!,
+    );
+  }
+
+  @override
+  $DriftSyncMetadataTable createAlias(String alias) {
+    return $DriftSyncMetadataTable(attachedDatabase, alias);
+  }
+}
+
+class DriftSyncMetadataData extends DataClass
+    implements Insertable<DriftSyncMetadataData> {
+  final String peerId;
+  final String lastSyncedHlc;
+  final String updatedAt;
+  const DriftSyncMetadataData({
+    required this.peerId,
+    required this.lastSyncedHlc,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['peer_id'] = Variable<String>(peerId);
+    map['last_synced_hlc'] = Variable<String>(lastSyncedHlc);
+    map['updated_at'] = Variable<String>(updatedAt);
+    return map;
+  }
+
+  DriftSyncMetadataCompanion toCompanion(bool nullToAbsent) {
+    return DriftSyncMetadataCompanion(
+      peerId: Value(peerId),
+      lastSyncedHlc: Value(lastSyncedHlc),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory DriftSyncMetadataData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DriftSyncMetadataData(
+      peerId: serializer.fromJson<String>(json['peerId']),
+      lastSyncedHlc: serializer.fromJson<String>(json['lastSyncedHlc']),
+      updatedAt: serializer.fromJson<String>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'peerId': serializer.toJson<String>(peerId),
+      'lastSyncedHlc': serializer.toJson<String>(lastSyncedHlc),
+      'updatedAt': serializer.toJson<String>(updatedAt),
+    };
+  }
+
+  DriftSyncMetadataData copyWith({
+    String? peerId,
+    String? lastSyncedHlc,
+    String? updatedAt,
+  }) => DriftSyncMetadataData(
+    peerId: peerId ?? this.peerId,
+    lastSyncedHlc: lastSyncedHlc ?? this.lastSyncedHlc,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  DriftSyncMetadataData copyWithCompanion(DriftSyncMetadataCompanion data) {
+    return DriftSyncMetadataData(
+      peerId: data.peerId.present ? data.peerId.value : this.peerId,
+      lastSyncedHlc:
+          data.lastSyncedHlc.present
+              ? data.lastSyncedHlc.value
+              : this.lastSyncedHlc,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DriftSyncMetadataData(')
+          ..write('peerId: $peerId, ')
+          ..write('lastSyncedHlc: $lastSyncedHlc, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(peerId, lastSyncedHlc, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DriftSyncMetadataData &&
+          other.peerId == this.peerId &&
+          other.lastSyncedHlc == this.lastSyncedHlc &&
+          other.updatedAt == this.updatedAt);
+}
+
+class DriftSyncMetadataCompanion
+    extends UpdateCompanion<DriftSyncMetadataData> {
+  final Value<String> peerId;
+  final Value<String> lastSyncedHlc;
+  final Value<String> updatedAt;
+  final Value<int> rowid;
+  const DriftSyncMetadataCompanion({
+    this.peerId = const Value.absent(),
+    this.lastSyncedHlc = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DriftSyncMetadataCompanion.insert({
+    required String peerId,
+    required String lastSyncedHlc,
+    required String updatedAt,
+    this.rowid = const Value.absent(),
+  }) : peerId = Value(peerId),
+       lastSyncedHlc = Value(lastSyncedHlc),
+       updatedAt = Value(updatedAt);
+  static Insertable<DriftSyncMetadataData> custom({
+    Expression<String>? peerId,
+    Expression<String>? lastSyncedHlc,
+    Expression<String>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (peerId != null) 'peer_id': peerId,
+      if (lastSyncedHlc != null) 'last_synced_hlc': lastSyncedHlc,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DriftSyncMetadataCompanion copyWith({
+    Value<String>? peerId,
+    Value<String>? lastSyncedHlc,
+    Value<String>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return DriftSyncMetadataCompanion(
+      peerId: peerId ?? this.peerId,
+      lastSyncedHlc: lastSyncedHlc ?? this.lastSyncedHlc,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (peerId.present) {
+      map['peer_id'] = Variable<String>(peerId.value);
+    }
+    if (lastSyncedHlc.present) {
+      map['last_synced_hlc'] = Variable<String>(lastSyncedHlc.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<String>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DriftSyncMetadataCompanion(')
+          ..write('peerId: $peerId, ')
+          ..write('lastSyncedHlc: $lastSyncedHlc, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$EngramDatabase extends GeneratedDatabase {
   _$EngramDatabase(QueryExecutor e) : super(e);
   $EngramDatabaseManager get managers => $EngramDatabaseManager(this);
@@ -3397,6 +3675,8 @@ abstract class _$EngramDatabase extends GeneratedDatabase {
   late final $DriftTopicsTable driftTopics = $DriftTopicsTable(this);
   late final $DriftTopicDocumentsTable driftTopicDocuments =
       $DriftTopicDocumentsTable(this);
+  late final $DriftSyncMetadataTable driftSyncMetadata =
+      $DriftSyncMetadataTable(this);
   late final Index idxConceptsSourceDocument = Index(
     'idx_concepts_source_document',
     'CREATE INDEX idx_concepts_source_document ON drift_concepts (source_document_id)',
@@ -3428,6 +3708,7 @@ abstract class _$EngramDatabase extends GeneratedDatabase {
     driftDocuments,
     driftTopics,
     driftTopicDocuments,
+    driftSyncMetadata,
     idxConceptsSourceDocument,
     idxRelationshipsFrom,
     idxRelationshipsTo,
@@ -5201,6 +5482,196 @@ typedef $$DriftTopicDocumentsTableProcessedTableManager =
       DriftTopicDocument,
       PrefetchHooks Function()
     >;
+typedef $$DriftSyncMetadataTableCreateCompanionBuilder =
+    DriftSyncMetadataCompanion Function({
+      required String peerId,
+      required String lastSyncedHlc,
+      required String updatedAt,
+      Value<int> rowid,
+    });
+typedef $$DriftSyncMetadataTableUpdateCompanionBuilder =
+    DriftSyncMetadataCompanion Function({
+      Value<String> peerId,
+      Value<String> lastSyncedHlc,
+      Value<String> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$DriftSyncMetadataTableFilterComposer
+    extends Composer<_$EngramDatabase, $DriftSyncMetadataTable> {
+  $$DriftSyncMetadataTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get peerId => $composableBuilder(
+    column: $table.peerId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastSyncedHlc => $composableBuilder(
+    column: $table.lastSyncedHlc,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$DriftSyncMetadataTableOrderingComposer
+    extends Composer<_$EngramDatabase, $DriftSyncMetadataTable> {
+  $$DriftSyncMetadataTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get peerId => $composableBuilder(
+    column: $table.peerId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastSyncedHlc => $composableBuilder(
+    column: $table.lastSyncedHlc,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$DriftSyncMetadataTableAnnotationComposer
+    extends Composer<_$EngramDatabase, $DriftSyncMetadataTable> {
+  $$DriftSyncMetadataTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get peerId =>
+      $composableBuilder(column: $table.peerId, builder: (column) => column);
+
+  GeneratedColumn<String> get lastSyncedHlc => $composableBuilder(
+    column: $table.lastSyncedHlc,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$DriftSyncMetadataTableTableManager
+    extends
+        RootTableManager<
+          _$EngramDatabase,
+          $DriftSyncMetadataTable,
+          DriftSyncMetadataData,
+          $$DriftSyncMetadataTableFilterComposer,
+          $$DriftSyncMetadataTableOrderingComposer,
+          $$DriftSyncMetadataTableAnnotationComposer,
+          $$DriftSyncMetadataTableCreateCompanionBuilder,
+          $$DriftSyncMetadataTableUpdateCompanionBuilder,
+          (
+            DriftSyncMetadataData,
+            BaseReferences<
+              _$EngramDatabase,
+              $DriftSyncMetadataTable,
+              DriftSyncMetadataData
+            >,
+          ),
+          DriftSyncMetadataData,
+          PrefetchHooks Function()
+        > {
+  $$DriftSyncMetadataTableTableManager(
+    _$EngramDatabase db,
+    $DriftSyncMetadataTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer:
+              () => $$DriftSyncMetadataTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer:
+              () => $$DriftSyncMetadataTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer:
+              () => $$DriftSyncMetadataTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> peerId = const Value.absent(),
+                Value<String> lastSyncedHlc = const Value.absent(),
+                Value<String> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DriftSyncMetadataCompanion(
+                peerId: peerId,
+                lastSyncedHlc: lastSyncedHlc,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String peerId,
+                required String lastSyncedHlc,
+                required String updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => DriftSyncMetadataCompanion.insert(
+                peerId: peerId,
+                lastSyncedHlc: lastSyncedHlc,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper:
+              (p0) =>
+                  p0
+                      .map(
+                        (e) => (
+                          e.readTable(table),
+                          BaseReferences(db, table, e),
+                        ),
+                      )
+                      .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$DriftSyncMetadataTableProcessedTableManager =
+    ProcessedTableManager<
+      _$EngramDatabase,
+      $DriftSyncMetadataTable,
+      DriftSyncMetadataData,
+      $$DriftSyncMetadataTableFilterComposer,
+      $$DriftSyncMetadataTableOrderingComposer,
+      $$DriftSyncMetadataTableAnnotationComposer,
+      $$DriftSyncMetadataTableCreateCompanionBuilder,
+      $$DriftSyncMetadataTableUpdateCompanionBuilder,
+      (
+        DriftSyncMetadataData,
+        BaseReferences<
+          _$EngramDatabase,
+          $DriftSyncMetadataTable,
+          DriftSyncMetadataData
+        >,
+      ),
+      DriftSyncMetadataData,
+      PrefetchHooks Function()
+    >;
 
 class $EngramDatabaseManager {
   final _$EngramDatabase _db;
@@ -5217,4 +5688,6 @@ class $EngramDatabaseManager {
       $$DriftTopicsTableTableManager(_db, _db.driftTopics);
   $$DriftTopicDocumentsTableTableManager get driftTopicDocuments =>
       $$DriftTopicDocumentsTableTableManager(_db, _db.driftTopicDocuments);
+  $$DriftSyncMetadataTableTableManager get driftSyncMetadata =>
+      $$DriftSyncMetadataTableTableManager(_db, _db.driftSyncMetadata);
 }

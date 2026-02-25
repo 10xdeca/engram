@@ -140,6 +140,20 @@ class DriftTopicDocuments extends Table {
   Set<Column> get primaryKey => {topicId, documentId};
 }
 
+/// Stores per-peer sync metadata for the CRDT transport layer.
+///
+/// Each row tracks the last HLC we synced with a given peer, so
+/// subsequent syncs only exchange the delta. Populated by the future
+/// transport layer — the table is created now so the schema is ready.
+class DriftSyncMetadata extends Table {
+  TextColumn get peerId => text()();
+  TextColumn get lastSyncedHlc => text()();
+  TextColumn get updatedAt => text()();
+
+  @override
+  Set<Column> get primaryKey => {peerId};
+}
+
 // ---------------------------------------------------------------------------
 // Database
 // ---------------------------------------------------------------------------
@@ -159,6 +173,7 @@ class DriftTopicDocuments extends Table {
   DriftDocuments,
   DriftTopics,
   DriftTopicDocuments,
+  DriftSyncMetadata,
 ])
 class EngramDatabase extends _$EngramDatabase {
   EngramDatabase([QueryExecutor? executor])
@@ -168,14 +183,14 @@ class EngramDatabase extends _$EngramDatabase {
   EngramDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) => m.createAll(),
         onUpgrade: (m, from, to) async {
           if (from < 2) {
-            // Add is_deleted column with default false to all 6 tables.
+            // v1 → v2: Add is_deleted column with default false to all 6 tables.
             for (final table in [
               'drift_concepts',
               'drift_relationships',
@@ -189,6 +204,30 @@ class EngramDatabase extends _$EngramDatabase {
                 'NOT NULL DEFAULT 0',
               );
             }
+          }
+          if (from < 3) {
+            // v2 → v3: Add HLC indexes for efficient changeset queries
+            // (`WHERE hlc > ?`) and create sync metadata table.
+            for (final table in [
+              'drift_concepts',
+              'drift_relationships',
+              'drift_quiz_items',
+              'drift_documents',
+              'drift_topics',
+              'drift_topic_documents',
+            ]) {
+              await m.database.customStatement(
+                'CREATE INDEX IF NOT EXISTS idx_${table}_hlc '
+                'ON $table (hlc)',
+              );
+            }
+            await m.database.customStatement(
+              'CREATE TABLE IF NOT EXISTS drift_sync_metadata ('
+              'peer_id TEXT NOT NULL PRIMARY KEY, '
+              'last_synced_hlc TEXT NOT NULL, '
+              'updated_at TEXT NOT NULL'
+              ')',
+            );
           }
         },
       );
