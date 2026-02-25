@@ -4,7 +4,6 @@ import 'package:engram/src/models/relationship.dart';
 import 'package:engram/src/ui/graph/graph_edge.dart';
 import 'package:engram/src/ui/graph/graph_node.dart';
 import 'package:engram/src/ui/graph/graph_painter.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 GraphNode _node(String id, {Offset position = Offset.zero}) {
