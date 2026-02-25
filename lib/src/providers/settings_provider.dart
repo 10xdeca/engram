@@ -8,10 +8,6 @@ final sharedPreferencesProvider = Provider<SharedPreferences>(
   (_) => throw UnimplementedError('Override in main with actual instance'),
 );
 
-final dataDirProvider = Provider<String>(
-  (_) => throw UnimplementedError('Override in main with actual path'),
-);
-
 final settingsRepositoryProvider = Provider<SettingsRepository>(
   (ref) => SettingsRepository(ref.watch(sharedPreferencesProvider)),
 );
@@ -24,8 +20,7 @@ class SettingsNotifier extends Notifier<EngramConfig> {
   @override
   EngramConfig build() {
     final repo = ref.watch(settingsRepositoryProvider);
-    final dataDir = ref.watch(dataDirProvider);
-    return repo.load().copyWith(dataDir: dataDir);
+    return repo.load();
   }
 
   Future<void> setOutlineApiUrl(String value) async {

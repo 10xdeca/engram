@@ -19,7 +19,6 @@ void main() {
       return ProviderScope(
         overrides: [
           sharedPreferencesProvider.overrideWithValue(prefs),
-          dataDirProvider.overrideWithValue('/tmp/engram_test'),
         ],
         child: const MaterialApp(home: SettingsScreen()),
       );
