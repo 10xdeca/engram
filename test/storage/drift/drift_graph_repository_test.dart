@@ -716,6 +716,115 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
+  // purgeTombstones (#41)
+  // ---------------------------------------------------------------------------
+
+  group('purgeTombstones', () {
+    late HlcManager hlcManager;
+    late DriftGraphRepository hlcRepo;
+
+    setUp(() {
+      hlcManager = HlcManager(nodeId: 'test-device-001');
+      hlcRepo = DriftGraphRepository(db: db, hlcManager: hlcManager);
+    });
+
+    test('physically deletes tombstoned rows older than threshold', () async {
+      // Save and tombstone: save full graph, then save without c2/r1/q2
+      await hlcRepo.save(fullGraph());
+
+      await hlcRepo.save(KnowledgeGraph(
+        concepts: [
+          Concept(
+            id: 'c1',
+            name: 'Docker',
+            description: 'Container runtime',
+            sourceDocumentId: 'doc1',
+          ),
+        ],
+        quizItems: [
+          testQuizItem(id: 'q1', conceptId: 'c1'),
+        ],
+      ));
+
+      // c2, r1, q2 are tombstoned. Purge tombstones older than "now".
+      final purgeThreshold = hlcManager.now().toString();
+      final purged = await hlcRepo.purgeTombstones(before: purgeThreshold);
+
+      // Should have purged tombstoned rows
+      expect(purged, greaterThan(0));
+
+      // Raw DB should no longer contain c2
+      final rawConcepts = await db.select(db.driftConcepts).get();
+      expect(rawConcepts.length, 1);
+      expect(rawConcepts.first.id, 'c1');
+    });
+
+    test('tombstones newer than threshold survive purge', () async {
+      await hlcRepo.save(fullGraph());
+
+      // Record threshold BEFORE tombstoning
+      final purgeThreshold = hlcManager.now().toString();
+
+      // Now tombstone c2 (its HLC will be after purgeThreshold)
+      await hlcRepo.save(KnowledgeGraph(
+        concepts: [
+          Concept(
+            id: 'c1',
+            name: 'Docker',
+            description: 'Container runtime',
+            sourceDocumentId: 'doc1',
+          ),
+        ],
+      ));
+
+      final purged = await hlcRepo.purgeTombstones(before: purgeThreshold);
+
+      // Tombstoned c2 has HLC > threshold, so it should survive
+      expect(purged, 0);
+      final rawConcepts = await db.select(db.driftConcepts).get();
+      final c2 = rawConcepts.where((c) => c.id == 'c2');
+      expect(c2.length, 1);
+      expect(c2.first.isDeleted, isTrue);
+    });
+
+    test('non-deleted rows are never purged', () async {
+      await hlcRepo.save(fullGraph());
+
+      // Purge with a threshold far in the future
+      const farFuture = '9999-12-31T23:59:59.999Z-ffff-future';
+      final purged = await hlcRepo.purgeTombstones(before: farFuture);
+
+      // Nothing should be purged — all rows are active
+      expect(purged, 0);
+      final rawConcepts = await db.select(db.driftConcepts).get();
+      expect(rawConcepts.length, 2);
+    });
+
+    test('purges tombstones across all entity types', () async {
+      await hlcRepo.save(fullGraph());
+
+      // Tombstone everything
+      await hlcRepo.save(KnowledgeGraph());
+
+      // Purge all
+      const farFuture = '9999-12-31T23:59:59.999Z-ffff-future';
+      final purged = await hlcRepo.purgeTombstones(before: farFuture);
+
+      // 2 concepts + 1 relationship + 2 quiz items + 1 document + 1 topic
+      // + 1 topic-document = 8
+      expect(purged, 8);
+
+      // Raw DB should be empty
+      expect(await db.select(db.driftConcepts).get(), isEmpty);
+      expect(await db.select(db.driftRelationships).get(), isEmpty);
+      expect(await db.select(db.driftQuizItems).get(), isEmpty);
+      expect(await db.select(db.driftDocuments).get(), isEmpty);
+      expect(await db.select(db.driftTopics).get(), isEmpty);
+      expect(await db.select(db.driftTopicDocuments).get(), isEmpty);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // HLC stamping (#41)
   // ---------------------------------------------------------------------------
 
