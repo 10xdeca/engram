@@ -65,6 +65,37 @@ class GraphChangeset {
       topics.length +
       topicDocuments.length;
 
+  /// The lexicographically highest HLC across all rows, or empty string if
+  /// the changeset is empty.
+  ///
+  /// Used by the sync transport layer as a bookmark — the Firestore sync_log
+  /// stores this alongside each changeset so pull queries can filter by
+  /// `maxHlc > sinceHlc` without deserializing the full changeset.
+  String get maxHlc {
+    if (isEmpty) return '';
+
+    var best = '';
+    for (final c in concepts) {
+      if (c.hlc.compareTo(best) > 0) best = c.hlc;
+    }
+    for (final r in relationships) {
+      if (r.hlc.compareTo(best) > 0) best = r.hlc;
+    }
+    for (final q in quizItems) {
+      if (q.hlc.compareTo(best) > 0) best = q.hlc;
+    }
+    for (final d in documents) {
+      if (d.hlc.compareTo(best) > 0) best = d.hlc;
+    }
+    for (final t in topics) {
+      if (t.hlc.compareTo(best) > 0) best = t.hlc;
+    }
+    for (final td in topicDocuments) {
+      if (td.hlc.compareTo(best) > 0) best = td.hlc;
+    }
+    return best;
+  }
+
   /// Serializes to wire format using SQL column names.
   ///
   /// TypeConverter columns (`tags`, `type`) are serialized through their

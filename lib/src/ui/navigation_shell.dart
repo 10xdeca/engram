@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/sync_status.dart';
+import '../providers/crdt_sync_provider.dart';
 import '../providers/notification_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/sync_provider.dart';
@@ -43,6 +44,8 @@ class NavigationShellState extends ConsumerState<NavigationShell>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.read(notificationUpdaterProvider);
+      // Start CRDT sync: immediate push+pull, then periodic every 5 min.
+      ref.read(crdtSyncProvider.notifier).startPeriodicSync();
     });
   }
 
@@ -56,6 +59,12 @@ class NavigationShellState extends ConsumerState<NavigationShell>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkForUpdatesIfEnabled();
+      // Sync on resume — pull any remote changes while we were backgrounded.
+      ref.read(crdtSyncProvider.notifier).sync();
+    }
+    if (state == AppLifecycleState.paused) {
+      // Push pending changes before going to background.
+      ref.read(crdtSyncProvider.notifier).sync();
     }
   }
 

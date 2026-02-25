@@ -657,6 +657,33 @@ class DriftGraphRepository extends GraphRepository {
   }
 
   // -------------------------------------------------------------------------
+  // Sync metadata CRUD — per-peer HLC bookkeeping
+  // -------------------------------------------------------------------------
+
+  /// Returns the last HLC we synced with [peerId], or `null` if we've never
+  /// synced with this peer.
+  Future<String?> getLastSyncedHlc(String peerId) async {
+    final row = await (_db.select(_db.driftSyncMetadata)
+          ..where((t) => t.peerId.equals(peerId)))
+        .getSingleOrNull();
+    return row?.lastSyncedHlc;
+  }
+
+  /// Upserts the last HLC synced with [peerId].
+  ///
+  /// Uses `insertOnConflictUpdate` so the first call creates the row and
+  /// subsequent calls update it — no need for separate insert/update paths.
+  Future<void> updateLastSyncedHlc(String peerId, String hlc) async {
+    await _db.into(_db.driftSyncMetadata).insertOnConflictUpdate(
+          DriftSyncMetadataCompanion.insert(
+            peerId: peerId,
+            lastSyncedHlc: hlc,
+            updatedAt: DateTime.now().toUtc().toIso8601String(),
+          ),
+        );
+  }
+
+  // -------------------------------------------------------------------------
   // getLastModified — highest HLC across all tables
   // -------------------------------------------------------------------------
 
