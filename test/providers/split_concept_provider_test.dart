@@ -1,59 +1,44 @@
-import 'dart:convert';
-import 'dart:io';
-
+import 'package:drift/native.dart';
 import 'package:engram/src/models/concept.dart';
 import 'package:engram/src/models/knowledge_graph.dart';
 import 'package:engram/src/models/quiz_item.dart';
 import 'package:engram/src/models/relationship.dart';
 import 'package:engram/src/providers/graph_store_provider.dart';
 import 'package:engram/src/providers/knowledge_graph_provider.dart';
-import 'package:engram/src/providers/settings_provider.dart';
 import 'package:engram/src/providers/split_concept_provider.dart';
-import 'package:engram/src/storage/config.dart';
-import 'package:engram/src/storage/local_graph_repository.dart';
+import 'package:engram/src/storage/drift/drift_graph_repository.dart';
+import 'package:engram/src/storage/drift/engram_database.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:test/test.dart';
 
-class _FakeSettingsNotifier extends SettingsNotifier {
-  _FakeSettingsNotifier(this._dataDir);
-  final String _dataDir;
-  @override
-  EngramConfig build() => EngramConfig(dataDir: _dataDir);
-}
-
 void main() {
-  late Directory tempDir;
-  late LocalGraphRepository store;
+  late EngramDatabase db;
+  late DriftGraphRepository repo;
 
   setUp(() {
-    tempDir = Directory.systemTemp.createTempSync('engram_split_test_');
-    store = LocalGraphRepository(dataDir: tempDir.path);
+    db = EngramDatabase.forTesting(NativeDatabase.memory());
+    repo = DriftGraphRepository(db: db);
   });
 
-  tearDown(() {
-    tempDir.deleteSync(recursive: true);
+  tearDown(() async {
+    await db.close();
   });
 
-  ProviderContainer createContainer({KnowledgeGraph? initial}) {
+  Future<ProviderContainer> createContainer({KnowledgeGraph? initial}) async {
     if (initial != null) {
-      final json = const JsonEncoder.withIndent('  ').convert(initial.toJson());
-      File('${tempDir.path}/knowledge_graph.json').writeAsStringSync(json);
+      await repo.save(initial);
     }
 
-    return ProviderContainer(
-      overrides: [
-        settingsProvider.overrideWith(
-          () => _FakeSettingsNotifier(tempDir.path),
-        ),
-        graphRepositoryProvider.overrideWithValue(store),
-      ],
+    final container = ProviderContainer(
+      overrides: [graphRepositoryProvider.overrideWithValue(repo)],
     );
+    addTearDown(container.dispose);
+    return container;
   }
 
   group('SplitConceptNotifier', () {
-    test('starts in idle phase', () {
-      final container = createContainer();
-      addTearDown(container.dispose);
+    test('starts in idle phase', () async {
+      final container = await createContainer();
 
       final state = container.read(splitConceptProvider);
       expect(state.phase, SplitPhase.idle);
@@ -61,9 +46,8 @@ void main() {
       expect(state.suggestion, isNull);
     });
 
-    test('reset returns to idle', () {
-      final container = createContainer();
-      addTearDown(container.dispose);
+    test('reset returns to idle', () async {
+      final container = await createContainer();
 
       container.read(splitConceptProvider.notifier).reset();
       expect(container.read(splitConceptProvider).phase, SplitPhase.idle);
@@ -83,8 +67,7 @@ void main() {
         ],
       );
 
-      final container = createContainer(initial: initialGraph);
-      addTearDown(container.dispose);
+      final container = await createContainer(initial: initialGraph);
 
       await container.read(knowledgeGraphProvider.future);
 
@@ -148,8 +131,8 @@ void main() {
       expect(child1.parentConceptId, 'parent');
       expect(child1.isSubConcept, isTrue);
 
-      // Verify persisted to disk
-      final loaded = await store.load();
+      // Verify persisted to database
+      final loaded = await repo.load();
       expect(loaded.concepts.length, 3);
     });
   });

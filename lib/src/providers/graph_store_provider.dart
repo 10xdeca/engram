@@ -41,8 +41,3 @@ final graphRepositoryProvider = Provider<GraphRepository>((ref) {
 
   return driftRepo;
 });
-
-/// Backward-compatible alias so existing code referencing
-/// [graphStoreProvider] continues to compile during migration.
-@Deprecated('Use graphRepositoryProvider instead')
-final graphStoreProvider = graphRepositoryProvider;

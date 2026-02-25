@@ -9,7 +9,6 @@ import '../models/relationship.dart';
 /// - [DriftGraphRepository] — local SQLite via Drift (primary store)
 /// - [FirestoreGraphRepository] — cloud Firestore
 /// - [DualWriteGraphRepository] — reads from Drift, writes to both
-/// - [LocalGraphRepository] — legacy JSON file (deprecated)
 abstract class GraphRepository {
   Future<KnowledgeGraph> load();
 
