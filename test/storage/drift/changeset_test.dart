@@ -681,6 +681,219 @@ void main() {
   });
 
   // -------------------------------------------------------------------------
+  // 3-device convergence
+  // -------------------------------------------------------------------------
+
+  group('3-device convergence', () {
+    late EngramDatabase dbC;
+    late HlcManager hlcC;
+    late DriftGraphRepository repoC;
+
+    setUp(() {
+      dbC = EngramDatabase.forTesting(NativeDatabase.memory());
+      hlcC = HlcManager(nodeId: 'device-C');
+      repoC = DriftGraphRepository(db: dbC, hlcManager: hlcC);
+    });
+
+    tearDown(() async {
+      await dbC.close();
+    });
+
+    test('A, B, C edit same concept — different merge orders — all converge',
+        () async {
+      // All three start with the same concept
+      final base = KnowledgeGraph(
+        concepts: [
+          Concept(
+            id: 'c1',
+            name: 'Docker',
+            description: 'Base',
+            sourceDocumentId: 'doc1',
+          ),
+        ],
+      );
+      await repoA.save(base);
+      final seed = await repoA.getChangeset(modifiedAfter: '');
+      await repoB.mergeChangeset(seed);
+      await repoC.mergeChangeset(seed);
+
+      // Each device edits c1 at staggered times (A first, C last = newest)
+      await repoA.save(KnowledgeGraph(
+        concepts: [
+          Concept(
+            id: 'c1',
+            name: 'Docker',
+            description: 'Edit by A',
+            sourceDocumentId: 'doc1',
+          ),
+        ],
+      ));
+      await repoB.save(KnowledgeGraph(
+        concepts: [
+          Concept(
+            id: 'c1',
+            name: 'Docker',
+            description: 'Edit by B',
+            sourceDocumentId: 'doc1',
+          ),
+        ],
+      ));
+      await repoC.save(KnowledgeGraph(
+        concepts: [
+          Concept(
+            id: 'c1',
+            name: 'Docker',
+            description: 'Edit by C',
+            sourceDocumentId: 'doc1',
+          ),
+        ],
+      ));
+
+      final fromA = await repoA.getChangeset(modifiedAfter: '');
+      final fromB = await repoB.getChangeset(modifiedAfter: '');
+      final fromC = await repoC.getChangeset(modifiedAfter: '');
+
+      // Apply in different orders to each device
+      await repoA.mergeChangeset(fromB);
+      await repoA.mergeChangeset(fromC);
+
+      await repoB.mergeChangeset(fromC);
+      await repoB.mergeChangeset(fromA);
+
+      await repoC.mergeChangeset(fromA);
+      await repoC.mergeChangeset(fromB);
+
+      // All should converge — C's edit wins (newest HLC)
+      final loadA = await repoA.load();
+      final loadB = await repoB.load();
+      final loadC = await repoC.load();
+
+      expect(loadA.concepts.first.description, 'Edit by C');
+      expect(loadB.concepts.first.description, 'Edit by C');
+      expect(loadC.concepts.first.description, 'Edit by C');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Error paths
+  // -------------------------------------------------------------------------
+
+  group('error paths', () {
+    test('mergeChangeset without HlcManager throws StateError', () async {
+      final repoNoHlc = DriftGraphRepository(db: dbA);
+
+      await repoA.save(fullGraph());
+      final changeset = await repoA.getChangeset(modifiedAfter: '');
+
+      expect(
+        () => repoNoHlc.mergeChangeset(changeset),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('HlcManager'),
+          ),
+        ),
+      );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // purgeTombstones + merge interaction
+  // -------------------------------------------------------------------------
+
+  group('purgeTombstones + merge', () {
+    test('purged tombstones on A do not block modified rows from B', () async {
+      // Both devices start with c1
+      await repoA.save(KnowledgeGraph(
+        concepts: [
+          Concept(
+            id: 'c1',
+            name: 'Docker',
+            description: 'Original',
+            sourceDocumentId: 'doc1',
+          ),
+        ],
+      ));
+      final seed = await repoA.getChangeset(modifiedAfter: '');
+      await repoB.mergeChangeset(seed);
+
+      // A tombstones c1 (save empty graph → orphan tombstoning)
+      await repoA.save(KnowledgeGraph());
+
+      // A purges tombstones (physically deletes them)
+      final purged = await repoA.purgeTombstones(
+        before: '9999-12-31T23:59:59.999Z-FFFF-future',
+      );
+      expect(purged, greaterThan(0));
+
+      // Verify c1 is physically gone from A's DB
+      final rawA = await dbA.select(dbA.driftConcepts).get();
+      expect(rawA.where((c) => c.id == 'c1'), isEmpty);
+
+      // B modifies c1 (stamps it with B's HLC — no longer A's echo)
+      await repoB.save(KnowledgeGraph(
+        concepts: [
+          Concept(
+            id: 'c1',
+            name: 'Docker',
+            description: 'Updated by B',
+            sourceDocumentId: 'doc1',
+          ),
+        ],
+      ));
+
+      // B syncs to A — B's modified c1 has B's HLC, passes same-node guard
+      final fromB = await repoB.getChangeset(modifiedAfter: '');
+      await repoA.mergeChangeset(fromB);
+
+      // A should have c1 again (B's version wins over absence)
+      final loadA = await repoA.load();
+      expect(loadA.concepts.any((c) => c.id == 'c1'), isTrue);
+      expect(
+        loadA.concepts.firstWhere((c) => c.id == 'c1').description,
+        'Updated by B',
+      );
+    });
+
+    test('unmodified rows with original HLC are skipped by same-node guard',
+        () async {
+      // This documents a known behavior: if B holds an unmodified copy
+      // of A's data (still carrying A's HLC), and A purges the tombstone,
+      // B's changeset is filtered by A's same-node guard. This is correct
+      // — purgeTombstones should only be called after all peers confirmed
+      // receipt of the tombstone.
+      await repoA.save(KnowledgeGraph(
+        concepts: [
+          Concept(
+            id: 'c1',
+            name: 'Docker',
+            description: 'Original',
+            sourceDocumentId: 'doc1',
+          ),
+        ],
+      ));
+      final seed = await repoA.getChangeset(modifiedAfter: '');
+      await repoB.mergeChangeset(seed);
+
+      // A tombstones + purges c1
+      await repoA.save(KnowledgeGraph());
+      await repoA.purgeTombstones(
+        before: '9999-12-31T23:59:59.999Z-FFFF-future',
+      );
+
+      // B still has unmodified c1 (with A's original HLC)
+      final fromB = await repoB.getChangeset(modifiedAfter: '');
+      final written = await repoA.mergeChangeset(fromB);
+
+      // Same-node guard skips B's copy — it still carries A's HLC
+      expect(written, 0);
+      final loadA = await repoA.load();
+      expect(loadA.concepts, isEmpty);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Schema migration v2 → v3
   // -------------------------------------------------------------------------
 
