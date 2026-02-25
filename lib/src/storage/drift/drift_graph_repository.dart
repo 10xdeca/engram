@@ -474,25 +474,19 @@ class DriftGraphRepository extends GraphRepository {
 
   /// Merges an incoming changeset using last-write-wins (LWW) per HLC.
   ///
-  /// For each incoming row:
-  /// 1. Calls `receive(incoming.hlc)` on the [HlcManager] to advance the
-  ///    local clock (ensures subsequent local writes have causal ordering).
-  /// 2. Looks up the existing row by primary key.
-  /// 3. If no existing row exists, or the incoming HLC is newer: upsert.
-  /// 4. If the incoming HLC is older or equal: skip (idempotent).
+  /// For each table in the changeset:
+  /// 1. Filters out same-node rows (echoed back via relay) and advances
+  ///    the local clock for foreign rows (causal ordering).
+  /// 2. Batch-SELECTs existing rows by primary key (`WHERE id IN (...)`).
+  /// 3. Compares HLCs in Dart — rows with a newer HLC (or no existing
+  ///    row) are winners.
+  /// 4. Batch-INSERTs winners via `InsertMode.insertOrReplace`.
   ///
   /// Incoming HLCs are **preserved** (not re-stamped) — this is what makes
   /// merge idempotent. The entire operation runs in a transaction so
   /// [watch] listeners see a single atomic update.
   ///
   /// Returns the number of rows actually written (newer or new rows).
-  ///
-  /// **Performance note:** Currently uses per-row SELECT-then-upsert (N+1
-  /// pattern). At the expected scale (hundreds of rows per sync) this is
-  /// acceptable since each SELECT hits the primary key index. For large
-  /// changesets (1000+ rows), consider batch-SELECTing existing HLCs via
-  /// `WHERE id IN (...)`, comparing in Dart, then batch-INSERTing winners.
-  // TODO(perf): batch SELECT existing HLCs to avoid N+1 pattern
   Future<int> mergeChangeset(GraphChangeset changeset) async {
     if (changeset.isEmpty) return 0;
     final hlcManager = _hlcManager;
@@ -503,109 +497,157 @@ class DriftGraphRepository extends GraphRepository {
     var written = 0;
 
     await _db.transaction(() async {
-      // -- Concepts --
-      for (final incoming in changeset.concepts) {
-        if (_isSameNode(incoming.hlc, hlcManager)) continue;
-        _receiveHlc(incoming.hlc, hlcManager);
-        final existing = await (_db.select(_db.driftConcepts)
-              ..where((t) => t.id.equals(incoming.id)))
-            .getSingleOrNull();
-        if (existing == null || incoming.hlc.compareTo(existing.hlc) > 0) {
-          await _db
-              .into(_db.driftConcepts)
-              .insertOnConflictUpdate(incoming.toInsertCompanion());
-          written++;
-        }
-      }
-
-      // -- Relationships --
-      for (final incoming in changeset.relationships) {
-        if (_isSameNode(incoming.hlc, hlcManager)) continue;
-        _receiveHlc(incoming.hlc, hlcManager);
-        final existing = await (_db.select(_db.driftRelationships)
-              ..where((t) => t.id.equals(incoming.id)))
-            .getSingleOrNull();
-        if (existing == null || incoming.hlc.compareTo(existing.hlc) > 0) {
-          await _db
-              .into(_db.driftRelationships)
-              .insertOnConflictUpdate(incoming.toInsertCompanion());
-          written++;
-        }
-      }
-
-      // -- Quiz items --
-      for (final incoming in changeset.quizItems) {
-        if (_isSameNode(incoming.hlc, hlcManager)) continue;
-        _receiveHlc(incoming.hlc, hlcManager);
-        final existing = await (_db.select(_db.driftQuizItems)
-              ..where((t) => t.id.equals(incoming.id)))
-            .getSingleOrNull();
-        if (existing == null || incoming.hlc.compareTo(existing.hlc) > 0) {
-          await _db
-              .into(_db.driftQuizItems)
-              .insertOnConflictUpdate(incoming.toInsertCompanion());
-          written++;
-        }
-      }
-
-      // -- Documents (PK is documentId) --
-      for (final incoming in changeset.documents) {
-        if (_isSameNode(incoming.hlc, hlcManager)) continue;
-        _receiveHlc(incoming.hlc, hlcManager);
-        final existing = await (_db.select(_db.driftDocuments)
-              ..where((t) => t.documentId.equals(incoming.documentId)))
-            .getSingleOrNull();
-        if (existing == null || incoming.hlc.compareTo(existing.hlc) > 0) {
-          await _db
-              .into(_db.driftDocuments)
-              .insertOnConflictUpdate(incoming.toInsertCompanion());
-          written++;
-        }
-      }
-
-      // -- Topics --
-      for (final incoming in changeset.topics) {
-        if (_isSameNode(incoming.hlc, hlcManager)) continue;
-        _receiveHlc(incoming.hlc, hlcManager);
-        final existing = await (_db.select(_db.driftTopics)
-              ..where((t) => t.id.equals(incoming.id)))
-            .getSingleOrNull();
-        if (existing == null || incoming.hlc.compareTo(existing.hlc) > 0) {
-          await _db
-              .into(_db.driftTopics)
-              .insertOnConflictUpdate(incoming.toInsertCompanion());
-          written++;
-        }
-      }
-
-      // -- Topic documents (composite PK: topicId + documentId) --
-      for (final incoming in changeset.topicDocuments) {
-        if (_isSameNode(incoming.hlc, hlcManager)) continue;
-        _receiveHlc(incoming.hlc, hlcManager);
-        final existing = await (_db.select(_db.driftTopicDocuments)
-              ..where(
-                (t) =>
-                    t.topicId.equals(incoming.topicId) &
-                    t.documentId.equals(incoming.documentId),
-              ))
-            .getSingleOrNull();
-        if (existing == null || incoming.hlc.compareTo(existing.hlc) > 0) {
-          await _db
-              .into(_db.driftTopicDocuments)
-              .insertOnConflictUpdate(incoming.toInsertCompanion());
-          written++;
-        }
-      }
+      written += await _batchMerge<DriftConcept>(
+        incoming: changeset.concepts,
+        keyOf: (c) => c.id,
+        hlcOf: (c) => c.hlc,
+        companionOf: (c) => c.toInsertCompanion(),
+        selectByKeys: (keys) =>
+            (_db.select(_db.driftConcepts)
+                  ..where((t) => t.id.isIn(keys)))
+                .get(),
+        table: _db.driftConcepts,
+        hlcManager: hlcManager,
+      );
+      written += await _batchMerge<DriftRelationship>(
+        incoming: changeset.relationships,
+        keyOf: (r) => r.id,
+        hlcOf: (r) => r.hlc,
+        companionOf: (r) => r.toInsertCompanion(),
+        selectByKeys: (keys) =>
+            (_db.select(_db.driftRelationships)
+                  ..where((t) => t.id.isIn(keys)))
+                .get(),
+        table: _db.driftRelationships,
+        hlcManager: hlcManager,
+      );
+      written += await _batchMerge<DriftQuizItem>(
+        incoming: changeset.quizItems,
+        keyOf: (q) => q.id,
+        hlcOf: (q) => q.hlc,
+        companionOf: (q) => q.toInsertCompanion(),
+        selectByKeys: (keys) =>
+            (_db.select(_db.driftQuizItems)
+                  ..where((t) => t.id.isIn(keys)))
+                .get(),
+        table: _db.driftQuizItems,
+        hlcManager: hlcManager,
+      );
+      written += await _batchMerge<DriftDocument>(
+        incoming: changeset.documents,
+        keyOf: (d) => d.documentId,
+        hlcOf: (d) => d.hlc,
+        companionOf: (d) => d.toInsertCompanion(),
+        selectByKeys: (keys) =>
+            (_db.select(_db.driftDocuments)
+                  ..where((t) => t.documentId.isIn(keys)))
+                .get(),
+        table: _db.driftDocuments,
+        hlcManager: hlcManager,
+      );
+      written += await _batchMerge<DriftTopic>(
+        incoming: changeset.topics,
+        keyOf: (t) => t.id,
+        hlcOf: (t) => t.hlc,
+        companionOf: (t) => t.toInsertCompanion(),
+        selectByKeys: (keys) =>
+            (_db.select(_db.driftTopics)
+                  ..where((t) => t.id.isIn(keys)))
+                .get(),
+        table: _db.driftTopics,
+        hlcManager: hlcManager,
+      );
+      written += await _batchMerge<DriftTopicDocument>(
+        incoming: changeset.topicDocuments,
+        keyOf: (td) => '${td.topicId}|${td.documentId}',
+        hlcOf: (td) => td.hlc,
+        companionOf: (td) => td.toInsertCompanion(),
+        selectByKeys: (keys) async {
+          // Composite PK — fetch by topicId set, then filter in Dart.
+          final topicIds =
+              changeset.topicDocuments.map((td) => td.topicId).toSet();
+          final rows = await (_db.select(_db.driftTopicDocuments)
+                ..where((t) => t.topicId.isIn(topicIds)))
+              .get();
+          return rows
+              .where((r) => keys.contains('${r.topicId}|${r.documentId}'))
+              .toList();
+        },
+        table: _db.driftTopicDocuments,
+        hlcManager: hlcManager,
+      );
     });
 
     return written;
   }
 
+  /// Batch-merges a list of incoming rows against existing rows in [table].
+  ///
+  /// Uses a single `SELECT ... WHERE key IN (...)` per table instead of
+  /// per-row lookups, reducing N+1 queries to 1 SELECT + 1 batch INSERT.
+  ///
+  /// Note: SQLite's default `SQLITE_MAX_VARIABLE_NUMBER` is 999 (32766 in
+  /// newer builds). At the expected scale (hundreds of rows per sync) this
+  /// is not a concern. For very large changesets, chunk the key set.
+  Future<int> _batchMerge<T>({
+    required List<T> incoming,
+    required String Function(T) keyOf,
+    required String Function(T) hlcOf,
+    required Insertable<dynamic> Function(T) companionOf,
+    required Future<List<T>> Function(Set<String> keys) selectByKeys,
+    required TableInfo<Table, dynamic> table,
+    required HlcManager hlcManager,
+  }) async {
+    if (incoming.isEmpty) return 0;
+
+    // 1. Filter out same-node rows and advance HLC for foreign rows.
+    final foreign = <T>[];
+    for (final row in incoming) {
+      final hlc = hlcOf(row);
+      if (_isSameNode(hlc, hlcManager)) continue;
+      _receiveHlc(hlc, hlcManager);
+      foreign.add(row);
+    }
+    if (foreign.isEmpty) return 0;
+
+    // 2. Batch SELECT existing rows by primary key.
+    final keys = foreign.map(keyOf).toSet();
+    final existing = await selectByKeys(keys);
+    final existingHlcByKey = {for (final e in existing) keyOf(e): hlcOf(e)};
+
+    // 3. Determine winners — new rows or rows with a newer HLC.
+    final winners = <T>[];
+    for (final row in foreign) {
+      final existingHlc = existingHlcByKey[keyOf(row)];
+      if (existingHlc == null || hlcOf(row).compareTo(existingHlc) > 0) {
+        winners.add(row);
+      }
+    }
+    if (winners.isEmpty) return 0;
+
+    // 4. Batch INSERT winners.
+    await _db.batch((batch) {
+      for (final winner in winners) {
+        batch.insert(table, companionOf(winner),
+            mode: InsertMode.insertOrReplace);
+      }
+    });
+    return winners.length;
+  }
+
   /// Guards against merging our own HLCs back (would cause
   /// `DuplicateNodeException` in `Hlc.merge()`).
+  ///
+  /// Uses `Hlc.parse()` for exact node ID extraction rather than
+  /// `endsWith()`, which could false-match if node IDs share a suffix.
   bool _isSameNode(String hlcString, HlcManager hlcManager) {
     if (hlcString.isEmpty) return false;
-    return hlcString.endsWith(hlcManager.nodeId);
+    try {
+      return Hlc.parse(hlcString).nodeId == hlcManager.nodeId;
+    } on Object {
+      // Malformed HLC — treat as foreign node (safe fallback).
+      return false;
+    }
   }
 
   /// Advances the local HLC by receiving a remote HLC string.
