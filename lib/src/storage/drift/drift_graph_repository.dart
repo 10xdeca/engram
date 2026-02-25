@@ -239,18 +239,19 @@ class DriftGraphRepository extends GraphRepository {
   /// Tombstones orphan topic-document join rows.
   ///
   /// The composite `(topicId, documentId)` primary key can't use a simple
-  /// `NOT IN (...)` clause, so we query existing active pairs and compute
-  /// the diff in Dart. The number of topic-document pairs is typically
-  /// small (tens to low hundreds), so the per-row updates are fast.
+  /// Drift `isNotIn(...)` on a single column. Instead, we concatenate the
+  /// key columns with a `|` separator and use a single `NOT IN (...)` via
+  /// [customUpdate]. This is O(1) SQL round-trips regardless of the number
+  /// of orphan pairs — more efficient than per-row updates.
   Future<void> _tombstoneOrphanTopicDocuments(
     KnowledgeGraph graph,
     String hlc,
   ) async {
-    // Build set of incoming composite keys.
-    final incomingKeys = <String>{};
+    // Build set of incoming composite keys (pipe-delimited).
+    final incomingKeys = <String>[];
     for (final topic in graph.topics) {
       for (final docId in topic.documentIds) {
-        incomingKeys.add('${topic.id}\x00$docId');
+        incomingKeys.add('${topic.id}|$docId');
       }
     }
 
@@ -265,26 +266,80 @@ class DriftGraphRepository extends GraphRepository {
       return;
     }
 
-    // Query existing active pairs and tombstone orphans.
-    final existing = await (_db.select(_db.driftTopicDocuments)
-          ..where((t) => t.isDeleted.equals(false)))
-        .get();
+    // Single SQL statement: concatenate key columns and use NOT IN.
+    final placeholders = List.filled(incomingKeys.length, '?').join(', ');
+    await _db.customUpdate(
+      'UPDATE drift_topic_documents '
+      "SET is_deleted = 1, hlc = ? "
+      'WHERE is_deleted = 0 '
+      "AND (topic_id || '|' || document_id) NOT IN ($placeholders)",
+      variables: [
+        Variable<String>(hlc),
+        ...incomingKeys.map((k) => Variable<String>(k)),
+      ],
+      updates: {_db.driftTopicDocuments},
+    );
+  }
 
-    for (final row in existing) {
-      final key = '${row.topicId}\x00${row.documentId}';
-      if (!incomingKeys.contains(key)) {
-        await (_db.update(_db.driftTopicDocuments)
-              ..where(
-                (t) =>
-                    t.topicId.equals(row.topicId) &
-                    t.documentId.equals(row.documentId),
-              ))
-            .write(DriftTopicDocumentsCompanion(
-              isDeleted: const Value(true),
-              hlc: Value(hlc),
-            ));
-      }
-    }
+  // -------------------------------------------------------------------------
+  // purgeTombstones — physical deletion for sync cleanup
+  // -------------------------------------------------------------------------
+
+  /// Physically removes tombstoned rows with `hlc < [before]`.
+  ///
+  /// Called by the sync layer after confirming all replicas have received
+  /// the tombstones. This prevents unbounded tombstone growth. Safe to call
+  /// at any time — only affects rows that are already soft-deleted and
+  /// whose HLC timestamp is strictly less than the threshold.
+  ///
+  /// Returns the total number of rows purged across all tables.
+  Future<int> purgeTombstones({required String before}) async {
+    var count = 0;
+    await _db.transaction(() async {
+      count += await (_db.delete(_db.driftTopicDocuments)
+            ..where(
+              (t) =>
+                  t.isDeleted.equals(true) &
+                  t.hlc.isSmallerThanValue(before),
+            ))
+          .go();
+      count += await (_db.delete(_db.driftTopics)
+            ..where(
+              (t) =>
+                  t.isDeleted.equals(true) &
+                  t.hlc.isSmallerThanValue(before),
+            ))
+          .go();
+      count += await (_db.delete(_db.driftDocuments)
+            ..where(
+              (t) =>
+                  t.isDeleted.equals(true) &
+                  t.hlc.isSmallerThanValue(before),
+            ))
+          .go();
+      count += await (_db.delete(_db.driftQuizItems)
+            ..where(
+              (t) =>
+                  t.isDeleted.equals(true) &
+                  t.hlc.isSmallerThanValue(before),
+            ))
+          .go();
+      count += await (_db.delete(_db.driftRelationships)
+            ..where(
+              (t) =>
+                  t.isDeleted.equals(true) &
+                  t.hlc.isSmallerThanValue(before),
+            ))
+          .go();
+      count += await (_db.delete(_db.driftConcepts)
+            ..where(
+              (t) =>
+                  t.isDeleted.equals(true) &
+                  t.hlc.isSmallerThanValue(before),
+            ))
+          .go();
+    });
+    return count;
   }
 
   // -------------------------------------------------------------------------
