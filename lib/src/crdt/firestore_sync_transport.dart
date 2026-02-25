@@ -51,15 +51,18 @@ class FirestoreSyncTransport {
 
   /// Pulls changesets from other devices written after [sinceHlc].
   ///
-  /// Returns changesets ordered by `createdAt`, excluding entries from
-  /// [localNodeId]. The `nodeId` filter is applied in Dart rather than as
-  /// a Firestore compound query to avoid requiring a composite index (the
-  /// sync_log is per-user with typically 1-3 devices).
+  /// Orders by `maxHlc` (lexicographic HLC ordering) which doubles as the
+  /// range filter field — this avoids needing a composite Firestore index.
+  /// Entries from [localNodeId] are excluded in Dart rather than via a
+  /// compound query (sync_log is per-user, typically 1-3 devices).
   Future<List<PulledChangeset>> pullChangesets({
     required String sinceHlc,
     required String localNodeId,
   }) async {
-    Query query = _syncLog.orderBy('createdAt');
+    // Order by maxHlc — Firestore requires the orderBy field to match
+    // the range filter field. HLC strings are lexicographically ordered
+    // (ISO 8601 + hex counter), so this gives correct causal ordering.
+    Query query = _syncLog.orderBy('maxHlc');
 
     // Filter by maxHlc > sinceHlc if we have a bookmark.
     if (sinceHlc.isNotEmpty) {
