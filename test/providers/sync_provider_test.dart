@@ -52,7 +52,6 @@ void main() {
       return ProviderContainer(
         overrides: [
           sharedPreferencesProvider.overrideWithValue(prefs),
-          dataDirProvider.overrideWithValue('/tmp/engram_test'),
           settingsRepositoryProvider.overrideWithValue(settingsRepo),
           knowledgeGraphProvider.overrideWith(
             () => _PreloadedGraphNotifier(graph ?? KnowledgeGraph.empty),
