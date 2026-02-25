@@ -24,6 +24,11 @@ import 'engram_database.dart';
 /// rather than physically removed. This preserves tombstones for CRDT
 /// changeset propagation (#41).
 ///
+/// **Warning:** [save] tombstones every active row not in the incoming
+/// graph. The sync transport layer (Phase 5) should use [mergeChangeset]
+/// for incoming remote data — never [save] with a partial graph, or it
+/// will tombstone data from other devices.
+///
 /// When an [HlcManager] is provided, every write is stamped with a
 /// Hybrid Logical Clock timestamp for CRDT sync (#41). Rows with
 /// `isDeleted = true` are excluded from [load] results but preserved
@@ -481,6 +486,13 @@ class DriftGraphRepository extends GraphRepository {
   /// [watch] listeners see a single atomic update.
   ///
   /// Returns the number of rows actually written (newer or new rows).
+  ///
+  /// **Performance note:** Currently uses per-row SELECT-then-upsert (N+1
+  /// pattern). At the expected scale (hundreds of rows per sync) this is
+  /// acceptable since each SELECT hits the primary key index. For large
+  /// changesets (1000+ rows), consider batch-SELECTing existing HLCs via
+  /// `WHERE id IN (...)`, comparing in Dart, then batch-INSERTing winners.
+  // TODO(perf): batch SELECT existing HLCs to avoid N+1 pattern
   Future<int> mergeChangeset(GraphChangeset changeset) async {
     if (changeset.isEmpty) return 0;
     final hlcManager = _hlcManager;

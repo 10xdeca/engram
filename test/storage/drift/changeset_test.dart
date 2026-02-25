@@ -685,22 +685,23 @@ void main() {
   // -------------------------------------------------------------------------
 
   group('schema migration', () {
-    test('v2 → v3 creates HLC indexes and sync metadata table', () async {
-      // This test verifies the migration runs without error on a fresh DB
-      // (which goes through onCreate, not onUpgrade). The indexes should
-      // exist after creation.
-
-      // Verify HLC index exists by running a query that benefits from it
+    test('fresh v3 DB has HLC indexes and sync metadata table', () async {
+      // Fresh DB goes through onCreate → createAll, which creates
+      // @TableIndex annotations. Verify all 6 HLC indexes exist.
       final result = await dbA.customSelect(
         "SELECT name FROM sqlite_master WHERE type='index' "
         "AND name LIKE 'idx_%_hlc'",
       ).get();
 
-      // Fresh DB created by onCreate → createAll, which creates @TableIndex
-      // annotations but not our custom indexes. The custom indexes are only
-      // created in onUpgrade. For a fresh v3 DB, we verify the tables exist.
-      // The onUpgrade path is tested below.
-      expect(result, isNotNull); // query succeeds
+      final indexNames = result.map((r) => r.data['name'] as String).toSet();
+      expect(indexNames, containsAll([
+        'idx_drift_concepts_hlc',
+        'idx_drift_relationships_hlc',
+        'idx_drift_quiz_items_hlc',
+        'idx_drift_documents_hlc',
+        'idx_drift_topics_hlc',
+        'idx_drift_topic_documents_hlc',
+      ]));
 
       // Verify sync metadata table exists
       final tables = await dbA.customSelect(

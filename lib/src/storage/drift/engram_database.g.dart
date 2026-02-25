@@ -3681,6 +3681,10 @@ abstract class _$EngramDatabase extends GeneratedDatabase {
     'idx_concepts_source_document',
     'CREATE INDEX idx_concepts_source_document ON drift_concepts (source_document_id)',
   );
+  late final Index idxDriftConceptsHlc = Index(
+    'idx_drift_concepts_hlc',
+    'CREATE INDEX idx_drift_concepts_hlc ON drift_concepts (hlc)',
+  );
   late final Index idxRelationshipsFrom = Index(
     'idx_relationships_from',
     'CREATE INDEX idx_relationships_from ON drift_relationships (from_concept_id)',
@@ -3689,6 +3693,10 @@ abstract class _$EngramDatabase extends GeneratedDatabase {
     'idx_relationships_to',
     'CREATE INDEX idx_relationships_to ON drift_relationships (to_concept_id)',
   );
+  late final Index idxDriftRelationshipsHlc = Index(
+    'idx_drift_relationships_hlc',
+    'CREATE INDEX idx_drift_relationships_hlc ON drift_relationships (hlc)',
+  );
   late final Index idxQuizItemsConcept = Index(
     'idx_quiz_items_concept',
     'CREATE INDEX idx_quiz_items_concept ON drift_quiz_items (concept_id)',
@@ -3696,6 +3704,22 @@ abstract class _$EngramDatabase extends GeneratedDatabase {
   late final Index idxQuizItemsNextReview = Index(
     'idx_quiz_items_next_review',
     'CREATE INDEX idx_quiz_items_next_review ON drift_quiz_items (next_review)',
+  );
+  late final Index idxDriftQuizItemsHlc = Index(
+    'idx_drift_quiz_items_hlc',
+    'CREATE INDEX idx_drift_quiz_items_hlc ON drift_quiz_items (hlc)',
+  );
+  late final Index idxDriftDocumentsHlc = Index(
+    'idx_drift_documents_hlc',
+    'CREATE INDEX idx_drift_documents_hlc ON drift_documents (hlc)',
+  );
+  late final Index idxDriftTopicsHlc = Index(
+    'idx_drift_topics_hlc',
+    'CREATE INDEX idx_drift_topics_hlc ON drift_topics (hlc)',
+  );
+  late final Index idxDriftTopicDocumentsHlc = Index(
+    'idx_drift_topic_documents_hlc',
+    'CREATE INDEX idx_drift_topic_documents_hlc ON drift_topic_documents (hlc)',
   );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
@@ -3710,10 +3734,16 @@ abstract class _$EngramDatabase extends GeneratedDatabase {
     driftTopicDocuments,
     driftSyncMetadata,
     idxConceptsSourceDocument,
+    idxDriftConceptsHlc,
     idxRelationshipsFrom,
     idxRelationshipsTo,
+    idxDriftRelationshipsHlc,
     idxQuizItemsConcept,
     idxQuizItemsNextReview,
+    idxDriftQuizItemsHlc,
+    idxDriftDocumentsHlc,
+    idxDriftTopicsHlc,
+    idxDriftTopicDocumentsHlc,
   ];
 }
 
