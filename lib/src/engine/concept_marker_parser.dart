@@ -3,8 +3,9 @@ import '../models/narration_script.dart';
 /// Regex matching `[CONCEPT:id]content[/CONCEPT]` pairs.
 ///
 /// Concept IDs may contain alphanumerics, hyphens, and underscores.
-/// Uses a non-greedy `.*?` for the inner content so nested or adjacent
-/// markers parse correctly.
+/// Uses a non-greedy `.*?` for the inner content so adjacent markers parse
+/// correctly. Nesting is **not supported** — if tags are nested, the inner
+/// tags are stripped from the matched content as orphans.
 final _markerPattern = RegExp(
   r'\[CONCEPT:([\w-]+)\](.*?)\[/CONCEPT\]',
   dotAll: true,
@@ -40,8 +41,13 @@ MarkerParseResult parseConceptMarkers(String annotatedText) {
     final conceptId = match.group(1)!;
     final content = match.group(2)!;
 
+    // Strip any orphan tags that ended up inside the match content (e.g., from
+    // nested markers like [A]...[B]...[/B]...[/A] where the non-greedy regex
+    // captures the inner [B] tag as part of A's content).
+    final cleanContent = _stripOrphanTags(content);
+
     final startChar = buffer.length;
-    buffer.write(content);
+    buffer.write(cleanContent);
     final endChar = buffer.length;
 
     markers.add(ConceptMarker(

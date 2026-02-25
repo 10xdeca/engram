@@ -91,6 +91,19 @@ void main() {
       expect(result.markers[0].startChar, result.markers[0].endChar);
     });
 
+    test('strips inner tags when markers are nested', () {
+      // Nesting is not supported — the outer marker captures to the first
+      // [/CONCEPT], and the inner [CONCEPT:B] tag is stripped as an orphan.
+      const input =
+          '[CONCEPT:A]Outer [CONCEPT:B]Inner[/CONCEPT] End[/CONCEPT]';
+      final result = parseConceptMarkers(input);
+
+      // The inner [CONCEPT:B] tag should be stripped from the content.
+      expect(result.strippedText, contains('Outer Inner'));
+      expect(result.strippedText, isNot(contains('[CONCEPT')));
+      expect(result.strippedText, isNot(contains('[/CONCEPT')));
+    });
+
     test('preserves multi-sentence content inside markers', () {
       const input =
           '[CONCEPT:long]This is a longer explanation. It has two sentences.[/CONCEPT]';
