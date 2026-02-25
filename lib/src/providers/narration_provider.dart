@@ -12,6 +12,11 @@ import '../models/timestamped_concept.dart';
 import '../services/narration_service.dart';
 import 'service_providers.dart';
 
+/// Minimum position change (in seconds) to trigger a state update when the
+/// active concept set hasn't changed. Prevents excessive rebuilds from
+/// high-frequency position ticks while keeping the progress bar smooth.
+const _kPositionUpdateThreshold = 0.1;
+
 final narrationProvider =
     NotifierProvider<NarrationNotifier, NarrationSession>(
       NarrationNotifier.new,
@@ -38,10 +43,19 @@ Set<String> computeActiveConcepts(
 /// idle → generatingScript → synthesizingAudio → ready → playing ↔ paused → completed | error.
 ///
 /// Follows the same state-machine pattern as [RecommendationNotifier].
+///
+/// This notifier lives in the global Riverpod container, so audio playback
+/// continues when the user navigates away from the narration screen. This is
+/// intentional — narration is background audio by design, similar to a podcast
+/// player.
 class NarrationNotifier extends Notifier<NarrationSession> {
   AudioPlayer? _player;
   StreamSubscription<Duration>? _positionSub;
   StreamSubscription<PlayerState>? _playerStateSub;
+
+  /// Cached `.toList()` of timestamped concepts, set once in [_preparePlayer]
+  /// and reused on every position tick to avoid per-tick allocation.
+  List<TimestampedConcept> _timestampedConceptsList = const [];
 
   @override
   NarrationSession build() => const NarrationSession();
@@ -135,6 +149,9 @@ class NarrationNotifier extends Notifier<NarrationSession> {
     _disposePlayer();
     _player = AudioPlayer();
 
+    // Cache the concept list so _onPositionUpdate doesn't allocate per tick.
+    _timestampedConceptsList = state.timestampedConcepts.toList();
+
     // Load from in-memory bytes via StreamAudioSource.
     await _player!.setAudioSource(_BytesAudioSource(audioBytes));
 
@@ -150,7 +167,7 @@ class NarrationNotifier extends Notifier<NarrationSession> {
 
     // Compute which concepts are active at this position.
     final active = computeActiveConcepts(
-      state.timestampedConcepts.toList(),
+      _timestampedConceptsList,
       seconds,
     );
 
@@ -161,7 +178,8 @@ class NarrationNotifier extends Notifier<NarrationSession> {
         positionSeconds: seconds,
         activeConcepts: newActiveConcepts,
       );
-    } else if ((seconds - state.positionSeconds).abs() > 0.1) {
+    } else if ((seconds - state.positionSeconds).abs() >
+        _kPositionUpdateThreshold) {
       // Update position for progress bar even if concepts haven't changed.
       state = state.copyWith(positionSeconds: seconds);
     }
@@ -183,6 +201,7 @@ class NarrationNotifier extends Notifier<NarrationSession> {
     _playerStateSub = null;
     _player?.dispose();
     _player = null;
+    _timestampedConceptsList = const [];
   }
 }
 

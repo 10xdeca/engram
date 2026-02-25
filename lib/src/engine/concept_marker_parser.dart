@@ -19,6 +19,9 @@ final _orphanClosePattern = RegExp(r'\[/CONCEPT\]');
 
 /// Parses `[CONCEPT:id]...[/CONCEPT]` markers from an annotated script.
 ///
+/// Concept IDs must match `[a-zA-Z0-9_-]+`. IDs containing colons, spaces, or
+/// other characters are silently ignored (the tag is stripped as an orphan).
+///
 /// Returns a [MarkerParseResult] containing:
 /// - [MarkerParseResult.strippedText]: the narration text with all tags
 ///   removed, suitable for TTS synthesis.
