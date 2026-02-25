@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../crdt/hlc_manager.dart';
 import '../../models/concept.dart';
 import '../../models/knowledge_graph.dart';
 import '../../models/quiz_item.dart';
@@ -18,10 +19,22 @@ import 'engram_database.dart';
 /// atomic updates. The `save` method uses DELETE ALL + INSERT ALL — this
 /// is simpler than Firestore's upsert+diff pattern because SQLite
 /// transactions are local and fast.
+///
+/// When an [HlcManager] is provided, every write is stamped with a
+/// Hybrid Logical Clock timestamp for CRDT sync (#41). Rows with
+/// `isDeleted = true` are excluded from [load] results but preserved
+/// in the database for changeset propagation.
 class DriftGraphRepository extends GraphRepository {
-  DriftGraphRepository({required EngramDatabase db}) : _db = db;
+  DriftGraphRepository({required EngramDatabase db, HlcManager? hlcManager})
+      : _db = db,
+        _hlcManager = hlcManager;
 
   final EngramDatabase _db;
+  final HlcManager? _hlcManager;
+
+  /// Returns the current HLC string for stamping writes, or empty string
+  /// if no HlcManager is configured (backward compatible).
+  String _stampHlc() => _hlcManager?.now().toString() ?? '';
 
   // -------------------------------------------------------------------------
   // load
@@ -29,14 +42,26 @@ class DriftGraphRepository extends GraphRepository {
 
   @override
   Future<KnowledgeGraph> load() async {
-    // Query all tables in parallel.
+    // Query all tables in parallel, filtering out tombstoned rows.
     final results = await Future.wait([
-      _db.select(_db.driftConcepts).get(), // 0
-      _db.select(_db.driftRelationships).get(), // 1
-      _db.select(_db.driftQuizItems).get(), // 2
-      _db.select(_db.driftDocuments).get(), // 3
-      _db.select(_db.driftTopics).get(), // 4
-      _db.select(_db.driftTopicDocuments).get(), // 5
+      (_db.select(_db.driftConcepts)
+            ..where((t) => t.isDeleted.equals(false)))
+          .get(), // 0
+      (_db.select(_db.driftRelationships)
+            ..where((t) => t.isDeleted.equals(false)))
+          .get(), // 1
+      (_db.select(_db.driftQuizItems)
+            ..where((t) => t.isDeleted.equals(false)))
+          .get(), // 2
+      (_db.select(_db.driftDocuments)
+            ..where((t) => t.isDeleted.equals(false)))
+          .get(), // 3
+      (_db.select(_db.driftTopics)
+            ..where((t) => t.isDeleted.equals(false)))
+          .get(), // 4
+      (_db.select(_db.driftTopicDocuments)
+            ..where((t) => t.isDeleted.equals(false)))
+          .get(), // 5
     ]);
 
     final conceptRows = results[0] as List<DriftConcept>;
@@ -74,6 +99,9 @@ class DriftGraphRepository extends GraphRepository {
   Future<void> save(KnowledgeGraph graph) async {
     await _db.transaction(() async {
       // 1. Delete all existing data.
+      // TODO(#41): Replace DELETE ALL with upsert + orphan tombstoning in PR 3.
+      // Currently this wipes tombstones — acceptable while save() is the only
+      // write path, but must change before changeset sync is enabled.
       await Future.wait([
         _db.delete(_db.driftTopicDocuments).go(),
         _db.delete(_db.driftTopics).go(),
@@ -85,31 +113,37 @@ class DriftGraphRepository extends GraphRepository {
 
       // 2. Batch-insert all entities. Uses insertOrReplace as a safety net
       //    in case the model layer has duplicate IDs (e.g. cross-document
-      //    concept reuse during extraction).
+      //    concept reuse during extraction). Each row is stamped with an
+      //    HLC timestamp for CRDT sync.
+      //
+      // A single HLC is used for the entire batch — intentional. All rows
+      // in an atomic save share the same causal timestamp, which is correct
+      // for CRDT semantics (one logical event = one HLC).
+      final hlc = _stampHlc();
       await _db.batch((batch) {
         batch.insertAll(
           _db.driftConcepts,
-          graph.concepts.map((c) => c.toCompanion()).toList(),
+          graph.concepts.map((c) => c.toCompanion(hlc: hlc)).toList(),
           mode: InsertMode.insertOrReplace,
         );
         batch.insertAll(
           _db.driftRelationships,
-          graph.relationships.map((r) => r.toCompanion()).toList(),
+          graph.relationships.map((r) => r.toCompanion(hlc: hlc)).toList(),
           mode: InsertMode.insertOrReplace,
         );
         batch.insertAll(
           _db.driftQuizItems,
-          graph.quizItems.map((q) => q.toCompanion()).toList(),
+          graph.quizItems.map((q) => q.toCompanion(hlc: hlc)).toList(),
           mode: InsertMode.insertOrReplace,
         );
         batch.insertAll(
           _db.driftDocuments,
-          graph.documentMetadata.map((d) => d.toCompanion()).toList(),
+          graph.documentMetadata.map((d) => d.toCompanion(hlc: hlc)).toList(),
           mode: InsertMode.insertOrReplace,
         );
         batch.insertAll(
           _db.driftTopics,
-          graph.topics.map((t) => t.toCompanion()).toList(),
+          graph.topics.map((t) => t.toCompanion(hlc: hlc)).toList(),
           mode: InsertMode.insertOrReplace,
         );
 
@@ -121,6 +155,7 @@ class DriftGraphRepository extends GraphRepository {
               DriftTopicDocumentsCompanion.insert(
                 topicId: topic.id,
                 documentId: docId,
+                hlc: Value(hlc),
               ),
               mode: InsertMode.insertOrReplace,
             );
@@ -138,7 +173,7 @@ class DriftGraphRepository extends GraphRepository {
   Future<void> updateQuizItem(KnowledgeGraph graph, QuizItem item) async {
     await _db
         .into(_db.driftQuizItems)
-        .insertOnConflictUpdate(item.toCompanion());
+        .insertOnConflictUpdate(item.toCompanion(hlc: _stampHlc()));
   }
 
   // -------------------------------------------------------------------------
@@ -152,20 +187,21 @@ class DriftGraphRepository extends GraphRepository {
     required List<Relationship> relationships,
     required List<QuizItem> quizItems,
   }) async {
+    final hlc = _stampHlc();
     await _db.batch((batch) {
       batch.insertAll(
         _db.driftConcepts,
-        concepts.map((c) => c.toCompanion()).toList(),
+        concepts.map((c) => c.toCompanion(hlc: hlc)).toList(),
         mode: InsertMode.insertOrReplace,
       );
       batch.insertAll(
         _db.driftRelationships,
-        relationships.map((r) => r.toCompanion()).toList(),
+        relationships.map((r) => r.toCompanion(hlc: hlc)).toList(),
         mode: InsertMode.insertOrReplace,
       );
       batch.insertAll(
         _db.driftQuizItems,
-        quizItems.map((q) => q.toCompanion()).toList(),
+        quizItems.map((q) => q.toCompanion(hlc: hlc)).toList(),
         mode: InsertMode.insertOrReplace,
       );
     });

@@ -16,7 +16,8 @@ part 'engram_database.g.dart';
 /// Maps 1:1 to the domain model. `tags` is stored as JSON TEXT since it's
 /// never queried independently. `embedding` is reserved for future concept
 /// embedding support (#39). `hlc` is the Hybrid Logical Clock timestamp
-/// for CRDT sync (#41).
+/// for CRDT sync (#41). `isDeleted` is a tombstone flag — deleted rows are
+/// hidden from [load] but preserved for changeset propagation.
 @TableIndex(name: 'idx_concepts_source_document', columns: {#sourceDocumentId})
 class DriftConcepts extends Table {
   TextColumn get id => text()();
@@ -27,6 +28,7 @@ class DriftConcepts extends Table {
   TextColumn get parentConceptId => text().nullable()();
   BlobColumn get embedding => blob().nullable()();
   TextColumn get hlc => text().withDefault(const Constant(''))();
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -52,6 +54,7 @@ class DriftRelationships extends Table {
   TextColumn get type =>
       text().map(const RelationshipTypeConverter())();
   TextColumn get hlc => text().withDefault(const Constant(''))();
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -79,6 +82,7 @@ class DriftQuizItems extends Table {
   RealColumn get predictedDifficulty => real().nullable()();
   IntColumn get reviewCount => integer().withDefault(const Constant(0))();
   TextColumn get hlc => text().withDefault(const Constant(''))();
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -97,6 +101,7 @@ class DriftDocuments extends Table {
   TextColumn get collectionName => text().nullable()();
   TextColumn get ingestedText => text().nullable()();
   TextColumn get hlc => text().withDefault(const Constant(''))();
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {documentId};
@@ -114,6 +119,7 @@ class DriftTopics extends Table {
   TextColumn get createdAt => text()();
   TextColumn get lastIngestedAt => text().nullable()();
   TextColumn get hlc => text().withDefault(const Constant(''))();
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -128,6 +134,7 @@ class DriftTopicDocuments extends Table {
   TextColumn get topicId => text()();
   TextColumn get documentId => text()();
   TextColumn get hlc => text().withDefault(const Constant(''))();
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {topicId, documentId};
@@ -161,7 +168,30 @@ class EngramDatabase extends _$EngramDatabase {
   EngramDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            // Add is_deleted column with default false to all 6 tables.
+            for (final table in [
+              'drift_concepts',
+              'drift_relationships',
+              'drift_quiz_items',
+              'drift_documents',
+              'drift_topics',
+              'drift_topic_documents',
+            ]) {
+              await m.database.customStatement(
+                'ALTER TABLE $table ADD COLUMN is_deleted INTEGER '
+                'NOT NULL DEFAULT 0',
+              );
+            }
+          }
+        },
+      );
 
   /// Opens the default on-disk database using drift_flutter.
   static QueryExecutor _openDefault() {

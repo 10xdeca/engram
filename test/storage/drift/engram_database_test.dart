@@ -365,6 +365,67 @@ void main() {
     });
   });
 
+  group('Schema migration v1→v2', () {
+    test('adds is_deleted column with default false to all tables', () async {
+      // Create a v1-style database by inserting data, then verify
+      // that the is_deleted column exists and defaults to false.
+      // (In-memory databases always get the latest schema via createAll(),
+      // so the is_deleted column is created fresh. This test verifies the
+      // column's default behavior which matches the migration's DEFAULT 0.)
+      await db.into(db.driftConcepts).insert(DriftConceptsCompanion.insert(
+            id: 'c1',
+            name: 'Test',
+            description: 'Test',
+            sourceDocumentId: 'doc1',
+            tags: IList(const []),
+          ));
+
+      final row = (await db.select(db.driftConcepts).get()).first;
+      expect(row.isDeleted, isFalse,
+          reason: 'is_deleted should default to false');
+    });
+
+    test('is_deleted column exists on all tables', () async {
+      // Verify we can query with isDeleted filter on every table.
+      // If the column didn't exist, these would throw.
+      await (db.select(db.driftConcepts)
+            ..where((t) => t.isDeleted.equals(false)))
+          .get();
+      await (db.select(db.driftRelationships)
+            ..where((t) => t.isDeleted.equals(false)))
+          .get();
+      await (db.select(db.driftQuizItems)
+            ..where((t) => t.isDeleted.equals(false)))
+          .get();
+      await (db.select(db.driftDocuments)
+            ..where((t) => t.isDeleted.equals(false)))
+          .get();
+      await (db.select(db.driftTopics)
+            ..where((t) => t.isDeleted.equals(false)))
+          .get();
+      await (db.select(db.driftTopicDocuments)
+            ..where((t) => t.isDeleted.equals(false)))
+          .get();
+    });
+
+    test('is_deleted can be set to true (tombstone)', () async {
+      await db.into(db.driftConcepts).insert(DriftConceptsCompanion.insert(
+            id: 'c1',
+            name: 'Test',
+            description: 'Test',
+            sourceDocumentId: 'doc1',
+            tags: IList(const []),
+          ));
+
+      // Tombstone via update
+      await (db.update(db.driftConcepts)..where((t) => t.id.equals('c1')))
+          .write(const DriftConceptsCompanion(isDeleted: Value(true)));
+
+      final row = (await db.select(db.driftConcepts).get()).first;
+      expect(row.isDeleted, isTrue);
+    });
+  });
+
   group('Cross-table operations', () {
     test('delete cascade scenario — orphan cleanup pattern', () async {
       // Insert a concept and its quiz item
