@@ -19,6 +19,9 @@ final knowledgeGraphProvider =
 class KnowledgeGraphNotifier extends AsyncNotifier<KnowledgeGraph> {
   @override
   Future<KnowledgeGraph> build() async {
+    // Seed from Firestore for pre-sync users (no-op if Drift already has data).
+    await seedFromFirestoreIfNeeded(ref);
+
     final repo = ref.watch(graphRepositoryProvider);
     var graph = await repo.load();
 

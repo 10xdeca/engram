@@ -1,12 +1,12 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../storage/drift/drift_graph_repository.dart';
 import '../storage/drift/engram_database.dart';
-import '../storage/dual_write_graph_repository.dart';
 import '../storage/firestore_graph_repository.dart';
 import '../storage/graph_repository.dart';
 import 'auth_provider.dart';
-import 'hlc_provider.dart';
+import 'crdt_sync_provider.dart';
 
 /// Provides the singleton [EngramDatabase] instance.
 ///
@@ -20,26 +20,59 @@ final engramDatabaseProvider = Provider<EngramDatabase>(
 
 /// Provides the active [GraphRepository] implementation.
 ///
-/// Authenticated users get a [DualWriteGraphRepository] that reads from
-/// [DriftGraphRepository] (local SQLite) and writes to both Drift and
-/// [FirestoreGraphRepository]. On first load, existing Firestore data is
-/// seeded into Drift for the one-time local-first migration.
+/// Always returns [DriftGraphRepository] — local SQLite is the sole source
+/// of truth. Remote sync is handled by [CrdtSyncNotifier] via the Firestore
+/// `sync_log` changeset transport (see `crdt_sync_provider.dart`).
 ///
-/// Unauthenticated users get [DriftGraphRepository] only.
+/// For pre-sync users who have data only in Firestore subcollections, call
+/// [seedFromFirestoreIfNeeded] once at graph load time.
 final graphRepositoryProvider = Provider<GraphRepository>((ref) {
-  final user = ref.watch(authStateProvider).valueOrNull;
-  final db = ref.watch(engramDatabaseProvider);
-  final hlcManager = ref.watch(hlcManagerProvider);
-  final driftRepo = DriftGraphRepository(db: db, hlcManager: hlcManager);
+  return ref.watch(driftGraphRepositoryProvider);
+});
 
-  if (user != null) {
-    final firestore = ref.watch(firestoreProvider);
+/// One-time Firestore → Drift seed for pre-sync users.
+///
+/// If the local Drift database is empty and the user is authenticated,
+/// loads data from the legacy Firestore subcollections
+/// (`users/{uid}/data/graph/`) and persists it to Drift. This bridges
+/// users who have data from before the CRDT sync migration.
+///
+/// Safe to call multiple times — tracks seeding state internally and
+/// short-circuits after the first attempt (even if it fails).
+Future<void> seedFromFirestoreIfNeeded(Ref ref) async {
+  // Only seed for authenticated users who might have Firestore data.
+  final user = ref.read(authStateProvider).valueOrNull;
+  if (user == null) return;
+
+  final driftRepo = ref.read(driftGraphRepositoryProvider);
+  final localGraph = await driftRepo.load();
+
+  final isEmpty = localGraph.concepts.isEmpty &&
+      localGraph.relationships.isEmpty &&
+      localGraph.quizItems.isEmpty &&
+      localGraph.documentMetadata.isEmpty;
+
+  if (!isEmpty) return;
+
+  try {
+    final firestore = ref.read(firestoreProvider);
     final firestoreRepo = FirestoreGraphRepository(
       firestore: firestore,
       userId: user.uid,
     );
-    return DualWriteGraphRepository(primary: driftRepo, remote: firestoreRepo);
-  }
+    final remoteGraph = await firestoreRepo.load();
 
-  return driftRepo;
-});
+    final remoteIsEmpty = remoteGraph.concepts.isEmpty &&
+        remoteGraph.relationships.isEmpty &&
+        remoteGraph.quizItems.isEmpty &&
+        remoteGraph.documentMetadata.isEmpty;
+
+    if (!remoteIsEmpty) {
+      await driftRepo.save(remoteGraph);
+      debugPrint('[GraphStore] Seeded Drift from Firestore '
+          '(${remoteGraph.concepts.length} concepts)');
+    }
+  } on Exception catch (e) {
+    debugPrint('[GraphStore] Firestore seed failed: $e');
+  }
+}

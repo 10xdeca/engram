@@ -894,6 +894,59 @@ void main() {
   });
 
   // -------------------------------------------------------------------------
+  // maxHlc
+  // -------------------------------------------------------------------------
+
+  group('maxHlc', () {
+    test('returns empty string for empty changeset', () {
+      const changeset = GraphChangeset();
+      expect(changeset.maxHlc, isEmpty);
+    });
+
+    test('returns the highest HLC across all tables', () async {
+      // Save graph with multiple entities — each gets the same HLC from save()
+      await repoA.save(fullGraph());
+      final afterSave = await repoA.getLastModified();
+
+      // Update a single quiz item — stamps a newer HLC
+      final updated = testQuizItem(
+        id: 'q1',
+        conceptId: 'c1',
+        difficulty: 6.0,
+      );
+      await repoA.updateQuizItem(await repoA.load(), updated);
+
+      final changeset = await repoA.getChangeset(modifiedAfter: '');
+
+      // maxHlc should equal the quiz item's newer HLC (from updateQuizItem)
+      final quizHlc = changeset.quizItems
+          .firstWhere((q) => q.id == 'q1')
+          .hlc;
+      expect(changeset.maxHlc, quizHlc);
+      expect(changeset.maxHlc.compareTo(afterSave), greaterThan(0));
+    });
+
+    test('works with single-table changeset', () async {
+      await repoA.save(fullGraph());
+      final afterSave = await repoA.getLastModified();
+
+      // Update only a quiz item
+      final updated = testQuizItem(
+        id: 'q1',
+        conceptId: 'c1',
+        difficulty: 7.0,
+      );
+      await repoA.updateQuizItem(await repoA.load(), updated);
+
+      // Get only the incremental changeset (just the quiz item)
+      final changeset = await repoA.getChangeset(modifiedAfter: afterSave);
+      expect(changeset.quizItems.length, 1);
+      expect(changeset.concepts, isEmpty);
+      expect(changeset.maxHlc, changeset.quizItems.first.hlc);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Schema migration v2 → v3
   // -------------------------------------------------------------------------
 
