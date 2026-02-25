@@ -10,9 +10,9 @@ import 'engram_database.dart';
 
 /// [GraphRepository] backed by a local Drift/SQLite database.
 ///
-/// Replaces [LocalGraphRepository] (JSON file) for unauthenticated/offline
-/// users. Provides reactive [watch] via Drift's table-update streams and
-/// efficient single-row updates for quiz reviews.
+/// Primary storage for unauthenticated/offline users. Provides reactive
+/// [watch] via Drift's table-update streams and efficient single-row
+/// updates for quiz reviews.
 ///
 /// All write operations run inside transactions so [watch] listeners see
 /// atomic updates. The `save` method uses DELETE ALL + INSERT ALL — this
