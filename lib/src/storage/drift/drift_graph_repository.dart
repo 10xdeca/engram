@@ -16,9 +16,11 @@ import 'engram_database.dart';
 /// updates for quiz reviews.
 ///
 /// All write operations run inside transactions so [watch] listeners see
-/// atomic updates. The `save` method uses DELETE ALL + INSERT ALL — this
-/// is simpler than Firestore's upsert+diff pattern because SQLite
-/// transactions are local and fast.
+/// atomic updates. The [save] method uses **upsert + orphan tombstoning**:
+/// incoming entities are upserted (INSERT OR REPLACE), and active rows
+/// not present in the incoming graph are soft-deleted (`isDeleted = true`)
+/// rather than physically removed. This preserves tombstones for CRDT
+/// changeset propagation (#41).
 ///
 /// When an [HlcManager] is provided, every write is stamped with a
 /// Hybrid Logical Clock timestamp for CRDT sync (#41). Rows with
@@ -92,34 +94,21 @@ class DriftGraphRepository extends GraphRepository {
   }
 
   // -------------------------------------------------------------------------
-  // save — DELETE ALL + INSERT ALL inside a transaction
+  // save — upsert + orphan tombstoning inside a transaction
   // -------------------------------------------------------------------------
 
   @override
   Future<void> save(KnowledgeGraph graph) async {
     await _db.transaction(() async {
-      // 1. Delete all existing data.
-      // TODO(#41): Replace DELETE ALL with upsert + orphan tombstoning in PR 3.
-      // Currently this wipes tombstones — acceptable while save() is the only
-      // write path, but must change before changeset sync is enabled.
-      await Future.wait([
-        _db.delete(_db.driftTopicDocuments).go(),
-        _db.delete(_db.driftTopics).go(),
-        _db.delete(_db.driftDocuments).go(),
-        _db.delete(_db.driftQuizItems).go(),
-        _db.delete(_db.driftRelationships).go(),
-        _db.delete(_db.driftConcepts).go(),
-      ]);
-
-      // 2. Batch-insert all entities. Uses insertOrReplace as a safety net
-      //    in case the model layer has duplicate IDs (e.g. cross-document
-      //    concept reuse during extraction). Each row is stamped with an
-      //    HLC timestamp for CRDT sync.
-      //
-      // A single HLC is used for the entire batch — intentional. All rows
+      // A single HLC is used for the entire save — intentional. All rows
       // in an atomic save share the same causal timestamp, which is correct
       // for CRDT semantics (one logical event = one HLC).
       final hlc = _stampHlc();
+
+      // 1. Upsert all incoming entities. Uses insertOrReplace as a safety
+      //    net for duplicate IDs (e.g. cross-document concept reuse during
+      //    extraction). This also resurrects any previously tombstoned rows
+      //    because INSERT OR REPLACE resets isDeleted to its default (false).
       await _db.batch((batch) {
         batch.insertAll(
           _db.driftConcepts,
@@ -162,7 +151,140 @@ class DriftGraphRepository extends GraphRepository {
           }
         }
       });
+
+      // 2. Tombstone orphans — active rows not present in the incoming
+      //    graph. These rows are soft-deleted (isDeleted = true) rather
+      //    than physically removed, preserving them for CRDT changeset
+      //    propagation. Drift's isNotIn([]) returns Constant(true), so
+      //    when a table has no incoming entities all active rows are
+      //    tombstoned — matching the old DELETE ALL semantics from load()'s
+      //    perspective while keeping the rows for sync.
+      await _tombstoneOrphans(graph, hlc);
     });
+  }
+
+  /// Tombstones active rows that are absent from [graph].
+  ///
+  /// For single-PK tables (concepts, relationships, quiz items, documents,
+  /// topics), uses `WHERE isDeleted = false AND id NOT IN (...)`. For the
+  /// composite-PK topic-document join table, queries existing pairs and
+  /// tombstones those not in the incoming set.
+  Future<void> _tombstoneOrphans(KnowledgeGraph graph, String hlc) async {
+    // -- Concepts --
+    await (_db.update(_db.driftConcepts)
+          ..where(
+            (t) =>
+                t.isDeleted.equals(false) &
+                t.id.isNotIn(graph.concepts.map((c) => c.id)),
+          ))
+        .write(DriftConceptsCompanion(
+          isDeleted: const Value(true),
+          hlc: Value(hlc),
+        ));
+
+    // -- Relationships --
+    await (_db.update(_db.driftRelationships)
+          ..where(
+            (t) =>
+                t.isDeleted.equals(false) &
+                t.id.isNotIn(graph.relationships.map((r) => r.id)),
+          ))
+        .write(DriftRelationshipsCompanion(
+          isDeleted: const Value(true),
+          hlc: Value(hlc),
+        ));
+
+    // -- Quiz items --
+    await (_db.update(_db.driftQuizItems)
+          ..where(
+            (t) =>
+                t.isDeleted.equals(false) &
+                t.id.isNotIn(graph.quizItems.map((q) => q.id)),
+          ))
+        .write(DriftQuizItemsCompanion(
+          isDeleted: const Value(true),
+          hlc: Value(hlc),
+        ));
+
+    // -- Documents (PK is documentId, not id) --
+    await (_db.update(_db.driftDocuments)
+          ..where(
+            (t) =>
+                t.isDeleted.equals(false) &
+                t.documentId.isNotIn(
+                  graph.documentMetadata.map((d) => d.documentId),
+                ),
+          ))
+        .write(DriftDocumentsCompanion(
+          isDeleted: const Value(true),
+          hlc: Value(hlc),
+        ));
+
+    // -- Topics --
+    await (_db.update(_db.driftTopics)
+          ..where(
+            (t) =>
+                t.isDeleted.equals(false) &
+                t.id.isNotIn(graph.topics.map((t) => t.id)),
+          ))
+        .write(DriftTopicsCompanion(
+          isDeleted: const Value(true),
+          hlc: Value(hlc),
+        ));
+
+    // -- Topic documents (composite PK: topicId + documentId) --
+    await _tombstoneOrphanTopicDocuments(graph, hlc);
+  }
+
+  /// Tombstones orphan topic-document join rows.
+  ///
+  /// The composite `(topicId, documentId)` primary key can't use a simple
+  /// `NOT IN (...)` clause, so we query existing active pairs and compute
+  /// the diff in Dart. The number of topic-document pairs is typically
+  /// small (tens to low hundreds), so the per-row updates are fast.
+  Future<void> _tombstoneOrphanTopicDocuments(
+    KnowledgeGraph graph,
+    String hlc,
+  ) async {
+    // Build set of incoming composite keys.
+    final incomingKeys = <String>{};
+    for (final topic in graph.topics) {
+      for (final docId in topic.documentIds) {
+        incomingKeys.add('${topic.id}\x00$docId');
+      }
+    }
+
+    if (incomingKeys.isEmpty) {
+      // No incoming pairs — tombstone all active rows.
+      await (_db.update(_db.driftTopicDocuments)
+            ..where((t) => t.isDeleted.equals(false)))
+          .write(DriftTopicDocumentsCompanion(
+            isDeleted: const Value(true),
+            hlc: Value(hlc),
+          ));
+      return;
+    }
+
+    // Query existing active pairs and tombstone orphans.
+    final existing = await (_db.select(_db.driftTopicDocuments)
+          ..where((t) => t.isDeleted.equals(false)))
+        .get();
+
+    for (final row in existing) {
+      final key = '${row.topicId}\x00${row.documentId}';
+      if (!incomingKeys.contains(key)) {
+        await (_db.update(_db.driftTopicDocuments)
+              ..where(
+                (t) =>
+                    t.topicId.equals(row.topicId) &
+                    t.documentId.equals(row.documentId),
+              ))
+            .write(DriftTopicDocumentsCompanion(
+              isDeleted: const Value(true),
+              hlc: Value(hlc),
+            ));
+      }
+    }
   }
 
   // -------------------------------------------------------------------------

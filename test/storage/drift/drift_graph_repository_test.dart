@@ -510,6 +510,212 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
+  // Upsert + orphan tombstoning (#41)
+  // ---------------------------------------------------------------------------
+
+  group('upsert + orphan tombstoning', () {
+    test('orphan concepts are tombstoned, not deleted', () async {
+      await repo.save(fullGraph()); // c1, c2
+
+      // Save a graph that keeps c1 but drops c2
+      final graphB = KnowledgeGraph(
+        concepts: [
+          Concept(
+            id: 'c1',
+            name: 'Docker Updated',
+            description: 'Updated description',
+            sourceDocumentId: 'doc1',
+          ),
+        ],
+      );
+      await repo.save(graphB);
+
+      // load() should return only c1
+      final loaded = await repo.load();
+      expect(loaded.concepts.length, 1);
+      expect(loaded.concepts.first.id, 'c1');
+      expect(loaded.concepts.first.name, 'Docker Updated');
+
+      // Raw DB should have c2 as tombstoned
+      final rawConcepts = await db.select(db.driftConcepts).get();
+      expect(rawConcepts.length, 2);
+      final tombstoned = rawConcepts.firstWhere((c) => c.id == 'c2');
+      expect(tombstoned.isDeleted, isTrue);
+      final alive = rawConcepts.firstWhere((c) => c.id == 'c1');
+      expect(alive.isDeleted, isFalse);
+    });
+
+    test('all entity types are tombstoned when saving empty graph', () async {
+      await repo.save(fullGraph());
+
+      // Save empty graph
+      await repo.save(KnowledgeGraph());
+
+      // load() should return empty
+      final loaded = await repo.load();
+      expect(loaded.concepts, isEmpty);
+      expect(loaded.relationships, isEmpty);
+      expect(loaded.quizItems, isEmpty);
+      expect(loaded.documentMetadata, isEmpty);
+      expect(loaded.topics, isEmpty);
+
+      // Raw DB should have tombstoned rows
+      final rawConcepts = await db.select(db.driftConcepts).get();
+      expect(rawConcepts.length, 2);
+      expect(rawConcepts.every((c) => c.isDeleted), isTrue);
+
+      final rawRels = await db.select(db.driftRelationships).get();
+      expect(rawRels.length, 1);
+      expect(rawRels.every((r) => r.isDeleted), isTrue);
+
+      final rawQuiz = await db.select(db.driftQuizItems).get();
+      expect(rawQuiz.length, 2);
+      expect(rawQuiz.every((q) => q.isDeleted), isTrue);
+
+      final rawDocs = await db.select(db.driftDocuments).get();
+      expect(rawDocs.length, 1);
+      expect(rawDocs.every((d) => d.isDeleted), isTrue);
+
+      final rawTopics = await db.select(db.driftTopics).get();
+      expect(rawTopics.length, 1);
+      expect(rawTopics.every((t) => t.isDeleted), isTrue);
+
+      final rawTopicDocs = await db.select(db.driftTopicDocuments).get();
+      expect(rawTopicDocs.length, 1);
+      expect(rawTopicDocs.every((td) => td.isDeleted), isTrue);
+    });
+
+    test('re-inserting a tombstoned entity resurrects it', () async {
+      final graph = fullGraph();
+      await repo.save(graph);
+
+      // Tombstone c1 via raw SQL (simulating a prior save that removed it)
+      await db.customStatement(
+        "UPDATE drift_concepts SET is_deleted = 1 WHERE id = 'c1'",
+      );
+
+      // Verify c1 is hidden
+      var loaded = await repo.load();
+      expect(loaded.concepts.any((c) => c.id == 'c1'), isFalse);
+
+      // Save a graph that includes c1 — should resurrect it
+      await repo.save(graph);
+      loaded = await repo.load();
+      expect(loaded.concepts.any((c) => c.id == 'c1'), isTrue);
+
+      // Raw DB should show isDeleted = false
+      final rawRow = (await db.select(db.driftConcepts).get())
+          .firstWhere((c) => c.id == 'c1');
+      expect(rawRow.isDeleted, isFalse);
+    });
+
+    test('pre-existing tombstones are preserved across saves', () async {
+      await repo.save(fullGraph());
+
+      // Tombstone c2 via raw SQL (simulating a CRDT merge from another device)
+      await db.customStatement(
+        "UPDATE drift_concepts SET is_deleted = 1, "
+        "hlc = 'old-tombstone-hlc' WHERE id = 'c2'",
+      );
+
+      // Save a graph with only c1 — c2 should remain tombstoned
+      final graphB = KnowledgeGraph(
+        concepts: [
+          Concept(
+            id: 'c1',
+            name: 'Docker',
+            description: 'Container runtime',
+            sourceDocumentId: 'doc1',
+          ),
+        ],
+      );
+      await repo.save(graphB);
+
+      // c2 should still exist in raw DB as tombstoned
+      final rawConcepts = await db.select(db.driftConcepts).get();
+      final c2 = rawConcepts.firstWhere((c) => c.id == 'c2');
+      expect(c2.isDeleted, isTrue);
+    });
+
+    test('orphan topic-document pairs are tombstoned', () async {
+      final graph = KnowledgeGraph(
+        topics: [
+          Topic(
+            id: 't1',
+            name: 'Topic A',
+            documentIds: const {'doc1', 'doc2', 'doc3'},
+            createdAt: DateTime.utc(2026, 1, 1),
+          ),
+        ],
+      );
+      await repo.save(graph);
+
+      // Save with fewer documents
+      final graphB = KnowledgeGraph(
+        topics: [
+          Topic(
+            id: 't1',
+            name: 'Topic A',
+            documentIds: const {'doc1'},
+            createdAt: DateTime.utc(2026, 1, 1),
+          ),
+        ],
+      );
+      await repo.save(graphB);
+
+      // load() should show only doc1
+      final loaded = await repo.load();
+      expect(loaded.topics.first.documentIds, {'doc1'});
+
+      // Raw DB should have 3 rows: doc1 alive, doc2 + doc3 tombstoned
+      final rawPairs = await db.select(db.driftTopicDocuments).get();
+      expect(rawPairs.length, 3);
+
+      final alive = rawPairs.where((r) => !r.isDeleted).toList();
+      expect(alive.length, 1);
+      expect(alive.first.documentId, 'doc1');
+
+      final tombstoned = rawPairs.where((r) => r.isDeleted).toList();
+      expect(tombstoned.length, 2);
+      expect(
+        tombstoned.map((r) => r.documentId).toSet(),
+        {'doc2', 'doc3'},
+      );
+    });
+
+    test('HLC is stamped on tombstoned orphan rows', () async {
+      final hlcManager = HlcManager(nodeId: 'test-device-001');
+      final hlcRepo = DriftGraphRepository(db: db, hlcManager: hlcManager);
+
+      await hlcRepo.save(fullGraph()); // c1, c2
+
+      // Save with only c1 — c2 becomes an orphan
+      final graphB = KnowledgeGraph(
+        concepts: [
+          Concept(
+            id: 'c1',
+            name: 'Docker',
+            description: 'Container runtime',
+            sourceDocumentId: 'doc1',
+          ),
+        ],
+      );
+      await hlcRepo.save(graphB);
+
+      // Tombstoned c2 should have an HLC from the second save
+      final rawConcepts = await db.select(db.driftConcepts).get();
+      final c2 = rawConcepts.firstWhere((c) => c.id == 'c2');
+      expect(c2.isDeleted, isTrue);
+      expect(c2.hlc, isNotEmpty);
+      expect(c2.hlc, contains('test-device-001'));
+
+      // c1 should also have an HLC (from the upsert)
+      final c1 = rawConcepts.firstWhere((c) => c.id == 'c1');
+      expect(c1.hlc, isNotEmpty);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // HLC stamping (#41)
   // ---------------------------------------------------------------------------
 
