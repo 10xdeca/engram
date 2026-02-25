@@ -254,6 +254,90 @@ void main() {
       expect(find.byType(CustomPaint), findsWidgets);
     });
 
+    testWidgets('sustained glow map renders without errors', (tester) async {
+      final graph = KnowledgeGraph(
+        concepts: [
+          Concept(
+            id: 'c1',
+            name: 'Docker',
+            description: 'Containers',
+            sourceDocumentId: 'doc1',
+          ),
+          Concept(
+            id: 'c2',
+            name: 'K8s',
+            description: 'Orchestration',
+            sourceDocumentId: 'doc1',
+          ),
+        ],
+        relationships: [
+          const Relationship(
+            id: 'r1',
+            fromConceptId: 'c2',
+            toConceptId: 'c1',
+            label: 'depends on',
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ForceDirectedGraphWidget(
+              graph: graph,
+              sustainedGlowMap: const {'c1': 1.0, 'c2': 0.4},
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+      expect(find.byType(CustomPaint), findsWidgets);
+    });
+
+    testWidgets('empty sustained glow map falls back to one-shot glow', (
+      tester,
+    ) async {
+      final graph = KnowledgeGraph(
+        concepts: [
+          Concept(
+            id: 'c1',
+            name: 'Docker',
+            description: 'Containers',
+            sourceDocumentId: 'doc1',
+          ),
+        ],
+        quizItems: [
+          QuizItem.newCard(
+            id: 'q1',
+            conceptId: 'c1',
+            question: 'Q?',
+            answer: 'A.',
+          ),
+        ],
+      );
+
+      var glowCompleted = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ForceDirectedGraphWidget(
+              graph: graph,
+              glowNodeIds: const {'c1'},
+              sustainedGlowMap: const {},
+              onGlowComplete: () => glowCompleted = true,
+            ),
+          ),
+        ),
+      );
+
+      // With empty sustained map and non-empty glowNodeIds, the one-shot
+      // glow animation should still fire.
+      await tester.pumpAndSettle();
+      expect(glowCompleted, isTrue);
+    });
+
     testWidgets('handles empty graph', (tester) async {
       await tester.pumpWidget(
         MaterialApp(

@@ -30,9 +30,10 @@ void main() {
 
       expect(find.text('Outline Wiki'), findsOneWidget);
       expect(find.text('Anthropic (Claude)'), findsOneWidget);
+      expect(find.text('ElevenLabs (Narration)'), findsOneWidget);
       expect(find.widgetWithText(TextField, 'API URL'), findsOneWidget);
-      // Two API Key fields (Outline + Anthropic)
-      expect(find.widgetWithText(TextField, 'API Key'), findsNWidgets(2));
+      // Three API Key fields (Outline + Anthropic + ElevenLabs)
+      expect(find.widgetWithText(TextField, 'API Key'), findsNWidgets(3));
     });
 
     testWidgets('shows warning when keys not configured', (tester) async {

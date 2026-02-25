@@ -25,6 +25,7 @@ class GraphPainter extends CustomPainter {
     this.currentUserUid,
     this.glowNodeIds = const {},
     this.glowIntensity = 0.0,
+    this.glowIntensityMap = const {},
   });
 
   final List<GraphNode> nodes;
@@ -47,6 +48,13 @@ class GraphPainter extends CustomPainter {
 
   /// Glow intensity from 1.0 (full) to 0.0 (invisible), driven by animation.
   final double glowIntensity;
+
+  /// Per-node glow intensities for sustained narration mode.
+  ///
+  /// When non-empty, these values take precedence over [glowNodeIds] +
+  /// [glowIntensity] for the matching node IDs. This allows narration-driven
+  /// glow to coexist with the one-shot ingest glow without breaking changes.
+  final Map<String, double> glowIntensityMap;
 
   // -- Concept node visual constants --
 
@@ -182,11 +190,17 @@ class GraphPainter extends CustomPainter {
       final tgt = edge.target.position;
 
       // Glow underlay for edges touching a glowing node.
-      if (glowIntensity > 0 &&
-          (glowNodeIds.contains(edge.source.id) ||
-              glowNodeIds.contains(edge.target.id))) {
+      // Use max intensity of endpoints — sustained map takes precedence.
+      final srcIntensity = glowIntensityMap[edge.source.id] ??
+          (glowNodeIds.contains(edge.source.id) ? glowIntensity : 0.0);
+      final tgtIntensity = glowIntensityMap[edge.target.id] ??
+          (glowNodeIds.contains(edge.target.id) ? glowIntensity : 0.0);
+      final edgeGlow =
+          srcIntensity > tgtIntensity ? srcIntensity : tgtIntensity;
+
+      if (edgeGlow > 0) {
         final glowPaint = Paint()
-          ..color = Colors.cyan.withValues(alpha: 0.6 * glowIntensity)
+          ..color = Colors.cyan.withValues(alpha: 0.6 * edgeGlow)
           ..strokeWidth = paint.strokeWidth + glowEdgeExtraWidth
           ..style = PaintingStyle.stroke
           ..maskFilter =
@@ -315,12 +329,17 @@ class GraphPainter extends CustomPainter {
       );
     }
 
-    // Cyan glow halo for newly ingested nodes
-    if (glowIntensity > 0 && glowNodeIds.contains(node.id)) {
+    // Resolve per-node glow intensity: sustained narration map takes
+    // precedence, falling back to the one-shot ingest glow.
+    final nodeGlowIntensity = glowIntensityMap[node.id] ??
+        (glowNodeIds.contains(node.id) ? glowIntensity : 0.0);
+
+    // Cyan glow halo for glowing nodes (narration or ingest)
+    if (nodeGlowIntensity > 0) {
       final glowRadius = effectiveRadius * glowHaloRadiusMultiplier;
       final haloPaint = Paint()
         ..shader = ui.Gradient.radial(node.position, glowRadius, [
-          Colors.cyan.withValues(alpha: 0.5 * glowIntensity),
+          Colors.cyan.withValues(alpha: 0.5 * nodeGlowIntensity),
           Colors.cyan.withValues(alpha: 0.0),
         ]);
       canvas.drawCircle(node.position, glowRadius, haloPaint);
@@ -330,7 +349,7 @@ class GraphPainter extends CustomPainter {
         node.position,
         effectiveRadius + 2,
         Paint()
-          ..color = Colors.cyan.withValues(alpha: 0.8 * glowIntensity)
+          ..color = Colors.cyan.withValues(alpha: 0.8 * nodeGlowIntensity)
           ..style = PaintingStyle.stroke
           ..strokeWidth = glowRingStrokeWidth,
       );
@@ -573,6 +592,7 @@ class GraphPainter extends CustomPainter {
         oldDelegate.guardianMap != guardianMap ||
         oldDelegate.currentUserUid != currentUserUid ||
         oldDelegate.glowNodeIds != glowNodeIds ||
-        oldDelegate.glowIntensity != glowIntensity;
+        oldDelegate.glowIntensity != glowIntensity ||
+        oldDelegate.glowIntensityMap != glowIntensityMap;
   }
 }

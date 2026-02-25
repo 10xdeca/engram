@@ -46,6 +46,7 @@ class ForceDirectedGraphWidget extends StatefulWidget {
     this.relayPulses = const [],
     this.relayConceptIds = const {},
     this.glowNodeIds = const {},
+    this.sustainedGlowMap = const {},
     this.onGlowComplete,
     this.onDebugTick,
     this.layoutWidth,
@@ -85,6 +86,13 @@ class ForceDirectedGraphWidget extends StatefulWidget {
 
   /// Node IDs that should glow with a cyan halo (newly ingested nodes).
   final Set<String> glowNodeIds;
+
+  /// Per-node glow intensities for sustained narration mode.
+  ///
+  /// When non-empty, these values take precedence over [glowNodeIds] for the
+  /// matching nodes. Both modes coexist — ingest glow and narration glow work
+  /// independently. Pass an empty map (the default) to disable narration glow.
+  final Map<String, double> sustainedGlowMap;
 
   /// Called when the glow animation finishes, so the caller can clear state.
   final VoidCallback? onGlowComplete;
@@ -710,6 +718,7 @@ class _ForceDirectedGraphWidgetState extends State<ForceDirectedGraphWidget>
                 widget.glowNodeIds.isNotEmpty
                     ? 1.0 - _glowController.value
                     : 0.0,
+            glowIntensityMap: widget.sustainedGlowMap,
           ),
           foregroundPainter:
               _catastropheActive

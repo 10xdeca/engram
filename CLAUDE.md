@@ -65,6 +65,7 @@ When starting a new session, remind the user about these architectural decisions
 - `docs/LOCAL_FIRST.md` — Local-first architecture plan. Decision: migrate to Drift/SQLite as primary storage, Firestore as sync peer. Device is source of truth; server handles compute, sync, and social coordination.
 - `docs/CRDT_SYNC_ARCHITECTURE.md` — CRDT sync design for local-first. Knowledge graph operations map naturally to G-Set, LWW-Register, and G-Counter CRDTs. Cooperative game features are accidentally CRDT-native.
 - `docs/FSRS_MIGRATION.md` — Migration from SM-2 to FSRS (Phases 1-4 complete). Key insight: FSRS has a Difficulty parameter that is a property of the card (not the learner), so Claude can predict it at extraction time — closing the loop between extraction and scheduling. Also enables per-concept `desired_retention` based on graph position, solves ease hell via mean reversion, and gives cooperative game mechanics (guardians, repair missions) a principled scheduling foundation.
+- `docs/FUTURE_DIRECTIONS.md` — Research on AI audio/video tools for narration-synced knowledge graph animation. Recommendation: ElevenLabs TTS (character-level timestamps in a single API call), real-time Flutter playback with glow sync as Phase 1, screen-record export as Phase 2, podcast generation as Phase 3, Remotion/Motion Canvas for polished video export as Phase 4-5.
 
 ## Open Issues
 
@@ -123,7 +124,7 @@ Current state: App running on macOS. FSRS Phase 1 merged. Knowledge graph animat
 3. **#39** — Concept embeddings (#38 done; embedding similarity could predict confusion-based difficulty for FSRS, and improve gap detection by identifying semantically near-miss clusters)
 
 ### Learning Science Features (Issues #74–#78)
-8. **#74** — Video-synchronized knowledge graph highlighting — nodes light up in sync with video playback, connected nodes glow with relationship explanations. Based on Mayer's signaling principle (g=0.38–0.53) and temporal contiguity (d=1.22)
+8. **#74** — Audio/video-synchronized knowledge graph highlighting — nodes light up in sync with narration, connected nodes glow with relationship explanations. Based on Mayer's signaling principle (g=0.38–0.53) and temporal contiguity (d=1.22). Implementation: ElevenLabs TTS with character-level timestamps → concept-to-timerange mapping → `activeConceptsProvider` → existing `glowNodeIdsProvider`. See `docs/FUTURE_DIRECTIONS.md` for full research on AI audio/video tools. Also investigate **Motion Canvas** (https://motioncanvas.io/) for standalone educational video export (3Blue1Brown-style programmatic animation in TypeScript)
 9. **#75** — Cross-source semantic linking + expanded ingestion (podcasts, books) — embedding-based discovery of connections across sources, both at ingestion time and offline. Analogical encoding makes far transfer 3x more likely (Gentner et al., 2003). #38 done, depends on #39
 10. **#76** — Elaborative interrogation (how/why deepening, d=0.56) + Ebbinghaus forgetting curve visualization — AI-guided Socratic follow-ups during quiz, plus visual sawtooth decay curves from FSRS retrievability
 11. **#77** — Dual coding — combine verbal quiz items with visual representations (diagrams, graph snippets, icons). Mayer's multimedia principle: d=1.35–1.67. Knowledge graph already provides spatial/visual encoding; extend to per-concept visuals
