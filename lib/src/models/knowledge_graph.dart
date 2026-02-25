@@ -99,19 +99,31 @@ class KnowledgeGraph {
             .map((c) => c.id)
             .toSet();
 
+    // IDs from the new extraction — used to deduplicate when Claude reuses
+    // existing concept IDs from other documents (cross-document linking).
+    final newConceptIds = result.concepts.map((c) => c.id).toSet();
+    final newRelationshipIds = result.relationships.map((r) => r.id).toSet();
+    final newQuizItemIds = result.quizItems.map((q) => q.id).toSet();
+
     final newConcepts =
         [
-          ...concepts.where((c) => c.sourceDocumentId != documentId),
+          ...concepts.where(
+            (c) =>
+                c.sourceDocumentId != documentId &&
+                !newConceptIds.contains(c.id),
+          ),
           ...result.concepts.map((c) => c.withSourceDocumentId(documentId)),
         ].lock;
 
     final newRelationships =
         [
           // Keep relationships not referencing old concepts from this doc
+          // and not replaced by the new extraction.
           ...relationships.where(
             (r) =>
                 !oldConceptIds.contains(r.fromConceptId) &&
-                !oldConceptIds.contains(r.toConceptId),
+                !oldConceptIds.contains(r.toConceptId) &&
+                !newRelationshipIds.contains(r.id),
           ),
           ...result.relationships,
         ].lock;
@@ -119,7 +131,12 @@ class KnowledgeGraph {
     final newQuizItems =
         [
           // Keep quiz items not referencing old concepts from this doc
-          ...quizItems.where((q) => !oldConceptIds.contains(q.conceptId)),
+          // and not replaced by the new extraction.
+          ...quizItems.where(
+            (q) =>
+                !oldConceptIds.contains(q.conceptId) &&
+                !newQuizItemIds.contains(q.id),
+          ),
           ...result.quizItems,
         ].lock;
 

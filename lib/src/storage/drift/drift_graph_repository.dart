@@ -83,27 +83,34 @@ class DriftGraphRepository extends GraphRepository {
         _db.delete(_db.driftConcepts).go(),
       ]);
 
-      // 2. Batch-insert all entities.
+      // 2. Batch-insert all entities. Uses insertOrReplace as a safety net
+      //    in case the model layer has duplicate IDs (e.g. cross-document
+      //    concept reuse during extraction).
       await _db.batch((batch) {
         batch.insertAll(
           _db.driftConcepts,
           graph.concepts.map((c) => c.toCompanion()).toList(),
+          mode: InsertMode.insertOrReplace,
         );
         batch.insertAll(
           _db.driftRelationships,
           graph.relationships.map((r) => r.toCompanion()).toList(),
+          mode: InsertMode.insertOrReplace,
         );
         batch.insertAll(
           _db.driftQuizItems,
           graph.quizItems.map((q) => q.toCompanion()).toList(),
+          mode: InsertMode.insertOrReplace,
         );
         batch.insertAll(
           _db.driftDocuments,
           graph.documentMetadata.map((d) => d.toCompanion()).toList(),
+          mode: InsertMode.insertOrReplace,
         );
         batch.insertAll(
           _db.driftTopics,
           graph.topics.map((t) => t.toCompanion()).toList(),
+          mode: InsertMode.insertOrReplace,
         );
 
         // Flatten topic → document join rows.
@@ -115,6 +122,7 @@ class DriftGraphRepository extends GraphRepository {
                 topicId: topic.id,
                 documentId: docId,
               ),
+              mode: InsertMode.insertOrReplace,
             );
           }
         }
