@@ -105,7 +105,7 @@ void main() {
 
   group('NarrationSession', () {
     test('default state is idle with empty collections', () {
-      final session = NarrationSession();
+      const session = NarrationSession();
 
       expect(session.phase, NarrationPhase.idle);
       expect(session.scriptText, isEmpty);
@@ -118,7 +118,7 @@ void main() {
     });
 
     test('copyWith updates specified fields', () {
-      final initial = NarrationSession();
+      const initial = NarrationSession();
       final updated = initial.copyWith(
         phase: NarrationPhase.generatingScript,
         scriptText: 'The concept of spaced repetition...',
@@ -150,7 +150,7 @@ void main() {
     });
 
     test('copyWith with timestamped concepts', () {
-      final initial = NarrationSession();
+      const initial = NarrationSession();
       final updated = initial.copyWith(
         timestampedConcepts: IList(const [
           TimestampedConcept(conceptId: 'a', startTime: 0.0, endTime: 2.0),
@@ -163,7 +163,7 @@ void main() {
     });
 
     test('copyWith with audioBytes', () {
-      final initial = NarrationSession();
+      const initial = NarrationSession();
       final bytes = Uint8List.fromList([0x00, 0x01, 0x02]);
       final updated = initial.copyWith(
         phase: NarrationPhase.ready,
@@ -175,7 +175,7 @@ void main() {
     });
 
     test('phase transitions follow expected flow', () {
-      var session = NarrationSession();
+      var session = const NarrationSession();
 
       // idle → generatingScript
       session = session.copyWith(phase: NarrationPhase.generatingScript);
@@ -207,7 +207,7 @@ void main() {
     });
 
     test('error phase includes message', () {
-      final session = NarrationSession();
+      const session = NarrationSession();
       final errored = session.copyWith(
         phase: NarrationPhase.error,
         errorMessage: 'ElevenLabs API rate limit exceeded',
