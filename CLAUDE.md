@@ -111,6 +111,9 @@ Current state: App running on macOS. FSRS Phase 1 merged. Knowledge graph animat
 - ✓ **Curiosity Engine Phase 1** — Gap analysis + prescriptive recommendations (#99): `GapAnalyzer` (4 gap types), `RecommendationService` (Claude-scored gap-filling), `RecommendationEvaluation` (predicted vs actual edges), `KnowledgeGap`/`Recommendation` models, `RecommendationsScreen`, dashboard curiosity card. Parallelized gap evaluation via `Future.wait`. Null-byte delimited edge keys in evaluation to avoid name collisions.
 - ✓ **Curiosity Engine Phase 2** — One-tap ingest + post-ingest evaluation (#100, #101): `ingestRecommendation()` on `RecommendationNotifier` (fetch→extract→merge→evaluate), `RecommendationIngestStatus`/`RecommendationIngestResult` types, `ingestResults` map on state, `_IngestAction` switch widget (idle/loading/completed/error), `_EvaluationBadge` with color-coded accuracy. `fromJson`/`toJson` on `RecommendationEvaluationResult`. Double-tap guard, `clockProvider` consistency, specific `OutlineApiException`/`ExtractionException` handling.
 - ✓ **Glow Integration** — See new nodes connect in the graph (#103): `ingestedConceptIds` on `RecommendationIngestResult`, `glowNodeIdsProvider` bridges recommendations→dashboard, `GraphPainter` cyan radial halo (3x radius) + bright ring + blurred edge underlay, 4s `AnimationController` fade on `ForceDirectedGraphWidget` with `onGlowComplete` callback, "View in Graph" button on completed recommendation cards navigates to Dashboard tab with glow.
+- ✓ **Local-first migration (#40)** — Drift/SQLite schema (#111), `DriftGraphRepository` (#112), `DualWriteGraphRepository` (#113), test migration (#115), dead code removal (#116), UX polish (#117)
+- ✓ **CRDT sync Phases 1–5 (#41)** — HLC service + node ID (#119), schema v2 with `is_deleted` tombstone + HLC stamping (#121), upsert + orphan tombstoning (#122–#123), changeset generation + LWW merge (#124–#125), `FirestoreSyncTransport` + `CrdtSyncNotifier` with periodic background sync (#126). Lifecycle wired in `NavigationShell`: immediate sync on init, periodic every 5 min, sync on app resume/pause via `WidgetsBindingObserver`
+- ✓ **Narration infrastructure (#74)** — Narration models + marker parsing engine (#108), ElevenLabs TTS client + narration script service (#109)
 
 ### Curiosity Engine — Next Phases
 1. **Evaluation feedback loop** — Feed post-ingest evaluation accuracy back into future recommendation prompts (follows FSRS Phase 4c calibration pattern). Persist evaluation results.
@@ -119,9 +122,8 @@ Current state: App running on macOS. FSRS Phase 1 merged. Knowledge graph animat
 4. **Autonomous ingestion** — With user consent, the system finds, fetches, and ingests gap-filling content automatically. The curiosity engine becomes self-feeding.
 
 ### Architecture — Next up
-1. **#40** — Local-first Drift/SQLite migration (schema should account for FSRS D/S/R fields + curiosity engine state)
-2. **#41** — CRDT sync layer (depends on #40; FSRS state needs LWW-Register per field)
-3. **#39** — Concept embeddings (#38 done; embedding similarity could predict confusion-based difficulty for FSRS, and improve gap detection by identifying semantically near-miss clusters)
+1. **#41 Phase 6** — Firestore optional: personal features work offline with Drift, auth gate becomes optional, sign-in unlocks sync + social
+2. **#39** — Concept embeddings (#38 done; embedding similarity could predict confusion-based difficulty for FSRS, and improve gap detection by identifying semantically near-miss clusters)
 
 ### Learning Science Features (Issues #74–#78)
 8. **#74** — Audio/video-synchronized knowledge graph highlighting — nodes light up in sync with narration, connected nodes glow with relationship explanations. Based on Mayer's signaling principle (g=0.38–0.53) and temporal contiguity (d=1.22). Implementation: ElevenLabs TTS with character-level timestamps → concept-to-timerange mapping → `activeConceptsProvider` → existing `glowNodeIdsProvider`. See `docs/FUTURE_DIRECTIONS.md` for full research on AI audio/video tools. Also investigate **Motion Canvas** (https://motioncanvas.io/) for standalone educational video export (3Blue1Brown-style programmatic animation in TypeScript)
