@@ -240,11 +240,15 @@ PowerSync provides a complete local-first sync layer for Flutter:
 - Row-level LWW (sufficient for single-user multi-device sync; per-field LWW
   deferred to social knowledge layer — see `docs/SOCIAL_KNOWLEDGE_PLAN.md`)
 
-### Phase 5: Sync Transport Layer (next)
+### Phase 5: Sync Transport Layer ✅
 
-- Background sync service (push/pull changesets over network)
-- Populate `drift_sync_metadata` with per-peer last-synced HLC
-- Server-side merge in Firestore (or migrate to Postgres)
+- `FirestoreSyncTransport`: push/pull changesets via `users/{uid}/sync_log`
+- `CrdtSyncNotifier`: orchestrates push → pull → merge cycle with separate
+  push/pull HLC bookmarks in `drift_sync_metadata`
+- `CrdtSyncState` tracks phase, last sync time, row counts
+- `startPeriodicSync()` for background sync (default 5 minutes)
+- Same-node echo guard (skip own entries on pull)
+- `cleanup(beforeHlc:)` for sync_log garbage collection
 
 ### Phase 6: Firestore Optional
 
