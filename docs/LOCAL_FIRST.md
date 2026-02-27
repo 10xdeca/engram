@@ -6,7 +6,7 @@
 
 Engram has two souls:
 
-1. **Personal knowledge atlas** — SM-2 scheduling, spaced repetition, knowledge graph, sub-concept mastery, cross-discipline semantic relationships. Inherently personal and offline-friendly.
+1. **Personal knowledge atlas** — FSRS scheduling, spaced repetition, knowledge graph, sub-concept mastery, cross-discipline semantic relationships. Inherently personal and offline-friendly.
 2. **Cooperative team game** — guardians, glory board, challenges, nudges, repair missions. Inherently networked.
 
 The current architecture (Firestore-primary, local JSON fallback) optimizes for soul #2 at the expense of soul #1. Local-first inverts this: the device is the primary read/write path, the server handles sync, compute, and social coordination.
@@ -83,8 +83,8 @@ The server is not diminished — its role is **clarified**:
 ### Migration Effort
 - Implementing Drift/SQLite tables to mirror the existing Firestore schema
 - Adding HLC timestamps for CRDT ordering
-- Building the sync layer (or adopting `sqlite_crdt` + `crdt_sync`)
-- Dual-running period where both storage paths coexist
+- Building the sync layer (custom CRDT on Drift — done, see Phase 4-5)
+- Dual-running period where both storage paths coexist (completed and removed)
 - Testing sync edge cases (offline for weeks, large deltas)
 
 ### What It Does NOT Cost
@@ -107,7 +107,7 @@ The server is not diminished — its role is **clarified**:
 - **Graph traversal** — recursive CTEs for shortest path, dependency chains
 - **FTS5** — full-text search across concept descriptions
 - **Battle-tested** — cross-platform, actively maintained, type-safe
-- **CRDT-compatible** — `sqlite_crdt` package provides HLC timestamps and automatic merge
+- **CRDT-compatible** — custom HLC + LWW merge layer built on top of Drift tables (Phases 1-5 complete)
 
 ### Schema (Mirrors Firestore)
 
@@ -133,23 +133,28 @@ CREATE TABLE quiz_items (
   concept_id TEXT REFERENCES concepts(id),
   question TEXT NOT NULL,
   answer TEXT NOT NULL,
-  ease_factor REAL NOT NULL DEFAULT 2.5,
+  difficulty REAL NOT NULL DEFAULT 0.0,
+  stability REAL NOT NULL DEFAULT 0.0,
+  fsrs_state INTEGER NOT NULL DEFAULT 0,
+  lapses INTEGER NOT NULL DEFAULT 0,
   interval INTEGER NOT NULL DEFAULT 0,
-  repetitions INTEGER NOT NULL DEFAULT 0,
   next_review TEXT,
   last_review TEXT,
-  hlc TEXT NOT NULL
+  predicted_difficulty REAL,
+  review_count INTEGER NOT NULL DEFAULT 0,
+  hlc TEXT NOT NULL,
+  is_deleted INTEGER NOT NULL DEFAULT 0
 );
 ```
 
 ### Migration Path
 
-The existing `GraphStore` interface already abstracts storage. The migration can be incremental:
+The existing `GraphStore` interface already abstracts storage. The migration was incremental:
 
-1. Add Drift as a parallel storage backend (dual-write with Firestore)
-2. Switch reads to Drift-primary (Firestore becomes write-through sync)
-3. Add CRDT sync layer for multi-device consistency
-4. Make Firestore sync optional (personal-only mode works without it)
+1. ✅ Added Drift as a parallel storage backend (dual-write with Firestore)
+2. ✅ Switched reads to Drift-primary (Firestore becomes write-through sync)
+3. ✅ Added CRDT sync layer for multi-device consistency (Phases 1-5 complete)
+4. Make Firestore sync optional (personal-only mode works without it) — Phase 6, next up
 
 ## Interaction with Other Decisions
 

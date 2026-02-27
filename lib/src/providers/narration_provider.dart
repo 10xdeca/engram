@@ -1,3 +1,8 @@
+// ignore_for_file: experimental_member_use
+// just_audio's StreamAudioSource API is marked @experimental but is the only
+// way to play in-memory audio without writing temp files. The alternative
+// (temp file I/O for a ~1.4 MB clip) is worse for both performance and
+// cleanup. This suppression is scoped to this file only.
 import 'dart:async';
 import 'dart:typed_data';
 
@@ -209,19 +214,16 @@ class NarrationNotifier extends Notifier<NarrationSession> {
 ///
 /// Avoids writing temp files to disk. Suitable for short narrations
 /// (~90s at 128kbps ≈ 1.4 MB).
-// ignore: experimental_member_use
 class _BytesAudioSource extends StreamAudioSource {
   _BytesAudioSource(this._bytes);
 
   final Uint8List _bytes;
 
   @override
-  // ignore: experimental_member_use
   Future<StreamAudioResponse> request([int? start, int? end]) async {
     final effectiveStart = start ?? 0;
     final effectiveEnd = end ?? _bytes.length;
 
-    // ignore: experimental_member_use
     return StreamAudioResponse(
       sourceLength: _bytes.length,
       contentLength: effectiveEnd - effectiveStart,

@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../storage/drift/drift_graph_repository.dart';
 import '../storage/drift/engram_database.dart';
-import '../storage/firestore_graph_repository.dart';
+import '../storage/firestore_graph_repository.dart' show FirestoreGraphLoader;
 import '../storage/graph_repository.dart';
 import 'auth_provider.dart';
 import 'crdt_sync_provider.dart';
@@ -56,11 +56,11 @@ Future<void> seedFromFirestoreIfNeeded(Ref ref) async {
 
   try {
     final firestore = ref.read(firestoreProvider);
-    final firestoreRepo = FirestoreGraphRepository(
+    final firestoreLoader = FirestoreGraphLoader(
       firestore: firestore,
       userId: user.uid,
     );
-    final remoteGraph = await firestoreRepo.load();
+    final remoteGraph = await firestoreLoader.load();
 
     final remoteIsEmpty = remoteGraph.concepts.isEmpty &&
         remoteGraph.relationships.isEmpty &&

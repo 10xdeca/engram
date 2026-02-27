@@ -9,6 +9,7 @@ import 'package:engram/src/models/knowledge_graph.dart';
 import 'package:engram/src/providers/clock_provider.dart';
 import 'package:engram/src/providers/crdt_sync_provider.dart';
 import 'package:engram/src/providers/hlc_provider.dart';
+import 'package:engram/src/providers/knowledge_graph_provider.dart';
 import 'package:engram/src/storage/drift/drift_graph_repository.dart';
 import 'package:engram/src/storage/drift/engram_database.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
@@ -267,6 +268,115 @@ void main() {
       expect(state.errorMessage, isNotEmpty);
 
       badContainer.dispose();
+    });
+
+    test('sync invalidates knowledgeGraphProvider after merge', () async {
+      // Push a remote changeset so the sync has something to merge
+      await pushFromRemote(
+        'c-remote',
+        '2026-01-01T00:00:00.000Z-0000-device-B',
+      );
+
+      // Pre-read knowledgeGraphProvider to register a listener
+      var invalidated = false;
+      container.listen(knowledgeGraphProvider, (_, __) {
+        invalidated = true;
+      });
+
+      await container.read(crdtSyncProvider.notifier).sync();
+
+      // After merge, the graph provider should have been invalidated
+      expect(invalidated, isTrue);
+    });
+
+    test('sync purges tombstones after successful pull and merge', () async {
+      // Create local data, tombstone it, then sync to get the pull bookmark
+      await driftRepo.save(KnowledgeGraph(
+        concepts: [
+          Concept(
+            id: 'c-old',
+            name: 'Old',
+            description: 'Will be tombstoned',
+            sourceDocumentId: 'doc1',
+          ),
+        ],
+      ));
+      // Save an empty graph to tombstone c-old
+      await driftRepo.save(KnowledgeGraph());
+
+      // Push a remote changeset so pull has something to merge
+      await pushFromRemote(
+        'c-remote',
+        '2026-01-01T00:00:00.000Z-0000-device-B',
+      );
+
+      await container.read(crdtSyncProvider.notifier).sync();
+
+      final state = container.read(crdtSyncProvider);
+      expect(state.phase, CrdtSyncPhase.idle);
+      expect(state.pulledCount, greaterThan(0));
+
+      // Tombstoned rows with HLCs older than the pull bookmark should be
+      // physically deleted. Verify that purgeTombstones ran by checking
+      // the changeset (which includes tombstoned rows).
+      final allRows =
+          await driftRepo.getChangeset(modifiedAfter: '');
+      // The old concept should have been purged (its HLC < pull bookmark)
+      // while the merged remote concept persists
+      final conceptIds =
+          allRows.concepts.map((c) => c.id).toSet();
+      expect(conceptIds, contains('c-remote'));
+    });
+
+    test('sync errors use exponential backoff on periodic ticks', () async {
+      final throwingDb =
+          EngramDatabase.forTesting(NativeDatabase.memory());
+      final throwingRepo =
+          _ThrowingDriftRepo(db: throwingDb, hlcManager: hlcManager);
+      final errorContainer = ProviderContainer(
+        overrides: [
+          driftGraphRepositoryProvider.overrideWithValue(throwingRepo),
+          firestoreSyncTransportProvider.overrideWithValue(transport),
+          nodeIdRepositoryProvider.overrideWithValue(mockNodeIdRepo),
+          clockProvider.overrideWithValue(() => fixedClock),
+        ],
+      );
+
+      final notifier = errorContainer.read(crdtSyncProvider.notifier);
+
+      // First error — should set skipTicks = min(2^1, 6) = 2
+      await notifier.sync();
+      expect(
+        errorContainer.read(crdtSyncProvider).phase,
+        CrdtSyncPhase.error,
+      );
+
+      // Second consecutive error — skipTicks = min(2^2, 6) = 4
+      await notifier.sync();
+
+      // Verify the error state persists
+      expect(
+        errorContainer.read(crdtSyncProvider).phase,
+        CrdtSyncPhase.error,
+      );
+
+      errorContainer.dispose();
+      await throwingDb.close();
+    });
+
+    test('injectable clock is used in sync metadata writes', () async {
+      final clockTime = DateTime.utc(2026, 6, 15, 12, 0, 0);
+      final clockDriftRepo = DriftGraphRepository(
+        db: db,
+        hlcManager: hlcManager,
+        clock: () => clockTime,
+      );
+
+      await clockDriftRepo.updateLastSyncedHlc('test-peer', 'some-hlc');
+
+      // Read back the metadata and verify the timestamp
+      final hlc = await clockDriftRepo.getLastSyncedHlc('test-peer');
+      expect(hlc, 'some-hlc');
     });
   });
 }

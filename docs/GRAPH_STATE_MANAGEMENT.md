@@ -35,7 +35,7 @@ No production-ready embedded graph database exists for Dart/Flutter:
 
 ### Entity-Component-System (Rejected)
 
-ECS maps naturally to a knowledge graph (Entity = concept, Components = mastery/scheduling/cluster data, Systems = SM-2/health/catastrophe). But Dart ECS packages (`flutter_event_component_system`, `entitas`) are immature, and the paradigm is unfamiliar to Flutter developers.
+ECS maps naturally to a knowledge graph (Entity = concept, Components = mastery/scheduling/cluster data, Systems = FSRS/health/catastrophe). But Dart ECS packages (`flutter_event_component_system`, `entitas`) are immature, and the paradigm is unfamiliar to Flutter developers.
 
 ### Normalized State Store (Recommended)
 

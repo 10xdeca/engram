@@ -34,12 +34,19 @@ import 'engram_database.dart';
 /// `isDeleted = true` are excluded from [load] results but preserved
 /// in the database for changeset propagation.
 class DriftGraphRepository extends GraphRepository {
-  DriftGraphRepository({required EngramDatabase db, HlcManager? hlcManager})
-      : _db = db,
-        _hlcManager = hlcManager;
+  DriftGraphRepository({
+    required EngramDatabase db,
+    HlcManager? hlcManager,
+    DateTime Function()? clock,
+  })  : _db = db,
+        _hlcManager = hlcManager,
+        _clock = clock ?? _defaultClock;
+
+  static DateTime _defaultClock() => DateTime.now().toUtc();
 
   final EngramDatabase _db;
   final HlcManager? _hlcManager;
+  final DateTime Function() _clock;
 
   /// Returns the current HLC string for stamping writes, or empty string
   /// if no HlcManager is configured (backward compatible).
@@ -678,7 +685,7 @@ class DriftGraphRepository extends GraphRepository {
           DriftSyncMetadataCompanion.insert(
             peerId: peerId,
             lastSyncedHlc: hlc,
-            updatedAt: DateTime.now().toUtc().toIso8601String(),
+            updatedAt: _clock().toIso8601String(),
           ),
         );
   }

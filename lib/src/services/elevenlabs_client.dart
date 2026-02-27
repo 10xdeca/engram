@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:meta/meta.dart';
 
+import 'retry.dart';
+
 /// Default ElevenLabs voice: "Rachel" — clear, neutral, educational tone.
 const _defaultVoiceId = '21m00Tcm4TlvDq8ikWAM';
 
@@ -59,26 +61,28 @@ class ElevenLabsClient {
       'https://api.elevenlabs.io/v1/text-to-speech/$_voiceId/with-timestamps',
     );
 
-    final response = await _httpClient.post(
-      uri,
-      headers: {
-        'xi-api-key': _apiKey,
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'text': text,
-        'model_id': _defaultModelId,
-        'output_format': 'mp3_44100_128',
-      }),
-    );
-
-    if (response.statusCode != 200) {
-      throw ElevenLabsException(
-        'TTS request failed: ${response.statusCode} ${response.body}',
+    return retryWithBackoff(() async {
+      final response = await _httpClient.post(
+        uri,
+        headers: {
+          'xi-api-key': _apiKey,
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'text': text,
+          'model_id': _defaultModelId,
+          'output_format': 'mp3_44100_128',
+        }),
       );
-    }
 
-    return _parseResponse(response.body);
+      if (response.statusCode != 200) {
+        throw ElevenLabsException(
+          'TTS request failed: ${response.statusCode} ${response.body}',
+        );
+      }
+
+      return _parseResponse(response.body);
+    });
   }
 
   TtsResponse _parseResponse(String responseBody) {

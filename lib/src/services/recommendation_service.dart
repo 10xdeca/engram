@@ -3,6 +3,7 @@ import 'package:anthropic_sdk_dart/anthropic_sdk_dart.dart';
 import '../models/knowledge_gap.dart';
 import '../models/recommendation.dart';
 import '../models/relationship.dart';
+import 'retry.dart';
 import 'outline_client.dart';
 
 const _systemPrompt = '''
@@ -208,31 +209,33 @@ class RecommendationService {
         ? ' (showing 50 of ${existingConceptNames.length})'
         : '';
 
-    final response = await _client.createMessage(
-      request: CreateMessageRequest(
-        model: Model.modelId(_model),
-        maxTokens: 4096,
-        system: const CreateMessageRequestSystem.text(_systemPrompt),
-        tools: [_evaluationTool],
-        toolChoice: const ToolChoice(
-          type: ToolChoiceType.tool,
-          name: _toolName,
-        ),
-        messages: [
-          Message(
-            role: MessageRole.user,
-            content: MessageContent.text(
-              'Evaluate these documents for filling a knowledge gap.\n\n'
-              '## Gap\n'
-              'Type: ${gap.type.name}\n'
-              'Description: ${gap.description}\n\n'
-              '## Existing concepts in the graph$truncationNote\n'
-              '$conceptList\n\n'
-              '## Candidate documents\n'
-              '$candidateList',
-            ),
+    final response = await retryWithBackoff(
+      () => _client.createMessage(
+        request: CreateMessageRequest(
+          model: Model.modelId(_model),
+          maxTokens: 4096,
+          system: const CreateMessageRequestSystem.text(_systemPrompt),
+          tools: [_evaluationTool],
+          toolChoice: const ToolChoice(
+            type: ToolChoiceType.tool,
+            name: _toolName,
           ),
-        ],
+          messages: [
+            Message(
+              role: MessageRole.user,
+              content: MessageContent.text(
+                'Evaluate these documents for filling a knowledge gap.\n\n'
+                '## Gap\n'
+                'Type: ${gap.type.name}\n'
+                'Description: ${gap.description}\n\n'
+                '## Existing concepts in the graph$truncationNote\n'
+                '$conceptList\n\n'
+                '## Candidate documents\n'
+                '$candidateList',
+              ),
+            ),
+          ],
+        ),
       ),
     );
 

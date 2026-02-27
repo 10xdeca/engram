@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +11,7 @@ import 'auth_provider.dart';
 import 'clock_provider.dart';
 import 'graph_store_provider.dart';
 import 'hlc_provider.dart';
+import 'knowledge_graph_provider.dart';
 
 /// Peer ID prefix for the Firestore sync_log push bookmark.
 const _pushPeerId = 'firestore-sync-log:push';
@@ -27,7 +29,8 @@ const _pullPeerId = 'firestore-sync-log:pull';
 final driftGraphRepositoryProvider = Provider<DriftGraphRepository>((ref) {
   final db = ref.watch(engramDatabaseProvider);
   final hlcManager = ref.watch(hlcManagerProvider);
-  return DriftGraphRepository(db: db, hlcManager: hlcManager);
+  final clock = ref.watch(clockProvider);
+  return DriftGraphRepository(db: db, hlcManager: hlcManager, clock: clock);
 });
 
 // ---------------------------------------------------------------------------
@@ -67,6 +70,12 @@ final crdtSyncProvider =
 /// [CrdtSyncState.isSyncing].
 class CrdtSyncNotifier extends Notifier<CrdtSyncState> {
   Timer? _periodicTimer;
+
+  /// Consecutive sync errors for exponential backoff.
+  int _consecutiveErrors = 0;
+
+  /// Number of periodic ticks to skip before retrying after errors.
+  int _skipTicks = 0;
 
   @override
   CrdtSyncState build() {
@@ -137,7 +146,26 @@ class CrdtSyncNotifier extends Notifier<CrdtSyncState> {
         if (highestPullHlc.isNotEmpty) {
           await driftRepo.updateLastSyncedHlc(_pullPeerId, highestPullHlc);
         }
+
+        // Refresh the in-memory graph so merged remote data is visible.
+        ref.invalidate(knowledgeGraphProvider);
+
+        // Purge tombstones and sync_log entries we've already consumed.
+        // Safe in star topology (Firestore hub). P2P sync would need
+        // per-peer tombstone tracking — see CRDT_SYNC_ARCHITECTURE.md.
+        // Wrapped in try/catch so cleanup failure doesn't fail the sync.
+        if (highestPullHlc.isNotEmpty) {
+          try {
+            await driftRepo.purgeTombstones(before: highestPullHlc);
+            await transport.cleanup(beforeHlc: highestPullHlc);
+          } catch (e) {
+            debugPrint('[CrdtSync] cleanup failed (non-fatal): $e');
+          }
+        }
       }
+
+      _consecutiveErrors = 0;
+      _skipTicks = 0;
 
       state = CrdtSyncState(
         phase: CrdtSyncPhase.idle,
@@ -148,6 +176,8 @@ class CrdtSyncNotifier extends Notifier<CrdtSyncState> {
       );
     } catch (e) {
       debugPrint('[CrdtSync] sync failed: $e');
+      _consecutiveErrors++;
+      _skipTicks = min(1 << _consecutiveErrors, 6);
       state = state.copyWith(
         phase: CrdtSyncPhase.error,
         errorMessage: '$e',
@@ -163,7 +193,13 @@ class CrdtSyncNotifier extends Notifier<CrdtSyncState> {
     Duration interval = const Duration(minutes: 5),
   }) {
     _stopTimer();
-    _periodicTimer = Timer.periodic(interval, (_) => sync());
+    _periodicTimer = Timer.periodic(interval, (_) {
+      if (_skipTicks > 0) {
+        _skipTicks--;
+        return;
+      }
+      sync();
+    });
     // Trigger an immediate sync as well.
     sync();
   }

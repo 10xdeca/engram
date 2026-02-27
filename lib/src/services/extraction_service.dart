@@ -6,6 +6,7 @@ import '../models/knowledge_graph.dart';
 import '../models/quiz_item.dart';
 import '../models/relationship.dart';
 import '../models/sub_concept_suggestion.dart';
+import 'retry.dart';
 
 const _systemPrompt = '''
 You are a knowledge extraction engine. Given a wiki document, extract:
@@ -250,27 +251,29 @@ class ExtractionService {
 
     final calibrationNote = _buildCalibrationNote(predictionAccuracy);
 
-    final response = await _client.createMessage(
-      request: CreateMessageRequest(
-        model: Model.modelId(_model),
-        maxTokens: 16384,
-        system: const CreateMessageRequestSystem.text(_systemPrompt),
-        tools: [_extractionTool],
-        toolChoice: const ToolChoice(
-          type: ToolChoiceType.tool,
-          name: _toolName,
-        ),
-        messages: [
-          Message(
-            role: MessageRole.user,
-            content: MessageContent.text(
-              'Extract knowledge from this document.'
-              '$existingIdsNote$calibrationNote\n\n'
-              '# $documentTitle\n\n'
-              '$documentContent',
-            ),
+    final response = await retryWithBackoff(
+      () => _client.createMessage(
+        request: CreateMessageRequest(
+          model: Model.modelId(_model),
+          maxTokens: 16384,
+          system: const CreateMessageRequestSystem.text(_systemPrompt),
+          tools: [_extractionTool],
+          toolChoice: const ToolChoice(
+            type: ToolChoiceType.tool,
+            name: _toolName,
           ),
-        ],
+          messages: [
+            Message(
+              role: MessageRole.user,
+              content: MessageContent.text(
+                'Extract knowledge from this document.'
+                '$existingIdsNote$calibrationNote\n\n'
+                '# $documentTitle\n\n'
+                '$documentContent',
+              ),
+            ),
+          ],
+        ),
       ),
     );
 
@@ -309,29 +312,31 @@ class ExtractionService {
     required String quizAnswer,
     required String sourceDocumentId,
   }) async {
-    final response = await _client.createMessage(
-      request: CreateMessageRequest(
-        model: Model.modelId(_model),
-        maxTokens: 4096,
-        system: const CreateMessageRequestSystem.text(_splitSystemPrompt),
-        tools: [_splitTool],
-        toolChoice: const ToolChoice(
-          type: ToolChoiceType.tool,
-          name: _splitToolName,
-        ),
-        messages: [
-          Message(
-            role: MessageRole.user,
-            content: MessageContent.text(
-              'Split this concept into sub-concepts.\n\n'
-              'Concept ID: $parentConceptId\n'
-              'Concept name: $parentName\n'
-              'Description: $parentDescription\n\n'
-              'Quiz question: $quizQuestion\n'
-              'Quiz answer: $quizAnswer',
-            ),
+    final response = await retryWithBackoff(
+      () => _client.createMessage(
+        request: CreateMessageRequest(
+          model: Model.modelId(_model),
+          maxTokens: 4096,
+          system: const CreateMessageRequestSystem.text(_splitSystemPrompt),
+          tools: [_splitTool],
+          toolChoice: const ToolChoice(
+            type: ToolChoiceType.tool,
+            name: _splitToolName,
           ),
-        ],
+          messages: [
+            Message(
+              role: MessageRole.user,
+              content: MessageContent.text(
+                'Split this concept into sub-concepts.\n\n'
+                'Concept ID: $parentConceptId\n'
+                'Concept name: $parentName\n'
+                'Description: $parentDescription\n\n'
+                'Quiz question: $quizQuestion\n'
+                'Quiz answer: $quizAnswer',
+              ),
+            ),
+          ],
+        ),
       ),
     );
 

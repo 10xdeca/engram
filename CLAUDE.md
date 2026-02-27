@@ -66,6 +66,7 @@ When starting a new session, remind the user about these architectural decisions
 - `docs/CRDT_SYNC_ARCHITECTURE.md` — CRDT sync design for local-first. Knowledge graph operations map naturally to G-Set, LWW-Register, and G-Counter CRDTs. Cooperative game features are accidentally CRDT-native.
 - `docs/FSRS_MIGRATION.md` — Migration from SM-2 to FSRS (Phases 1-4 complete). Key insight: FSRS has a Difficulty parameter that is a property of the card (not the learner), so Claude can predict it at extraction time — closing the loop between extraction and scheduling. Also enables per-concept `desired_retention` based on graph position, solves ease hell via mean reversion, and gives cooperative game mechanics (guardians, repair missions) a principled scheduling foundation.
 - `docs/FUTURE_DIRECTIONS.md` — Research on AI audio/video tools for narration-synced knowledge graph animation. Recommendation: ElevenLabs TTS (character-level timestamps in a single API call), real-time Flutter playback with glow sync as Phase 1, screen-record export as Phase 2, podcast generation as Phase 3, Remotion/Motion Canvas for polished video export as Phase 4-5.
+- `docs/P2P_SYNC_ARCHITECTURE.md` — Phase 7: optional peer-to-peer sync for data sovereignty. Adds LAN/Bluetooth transport alongside Firestore, changes tombstone lifecycle from hub-mediated purge to time-based retention, self-hosted relay option for on-prem deployments. Pending data sovereignty review.
 
 ## Open Issues
 
