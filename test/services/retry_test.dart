@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:anthropic_sdk_dart/anthropic_sdk_dart.dart';
+// HttpMethod is not publicly exported by anthropic_sdk_dart but is required
+// to construct AnthropicClientException in tests. Track upstream issue.
 import 'package:anthropic_sdk_dart/src/generated/client.dart' show HttpMethod;
 import 'package:engram/src/services/elevenlabs_client.dart';
 import 'package:engram/src/services/retry.dart';

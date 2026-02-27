@@ -151,6 +151,8 @@ class CrdtSyncNotifier extends Notifier<CrdtSyncState> {
         ref.invalidate(knowledgeGraphProvider);
 
         // Purge tombstones and sync_log entries we've already consumed.
+        // Safe in star topology (Firestore hub). P2P sync would need
+        // per-peer tombstone tracking — see CRDT_SYNC_ARCHITECTURE.md.
         // Wrapped in try/catch so cleanup failure doesn't fail the sync.
         if (highestPullHlc.isNotEmpty) {
           try {

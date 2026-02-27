@@ -15,7 +15,7 @@ The key insight: **Engram's knowledge graph operations are overwhelmingly additi
 │  Device A (phone)                               │
 │  ┌───────────┐  ┌────────────────────────────┐  │
 │  │ Drift/SQL │←→│ CRDT merge layer (HLC)     │──┼──┐
-│  │ (local)   │  │ custom CRDT layer (HLC+LWW)       │  │  │
+│  │ (local)   │  │ custom HLC+LWW             │  │  │
 │  └───────────┘  └────────────────────────────┘  │  │
 └─────────────────────────────────────────────────┘  │
                                                       │ background sync
@@ -23,7 +23,7 @@ The key insight: **Engram's knowledge graph operations are overwhelmingly additi
 │  Device B (laptop)                              │  │
 │  ┌───────────┐  ┌────────────────────────────┐  │  │
 │  │ Drift/SQL │←→│ CRDT merge layer (HLC)     │──┼──┤
-│  │ (local)   │  │ custom CRDT layer (HLC+LWW)       │  │  │
+│  │ (local)   │  │ custom HLC+LWW             │  │  │
 │  └───────────┘  └────────────────────────────┘  │  │
 └─────────────────────────────────────────────────┘  │
                                                       │
