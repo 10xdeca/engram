@@ -256,6 +256,15 @@ PowerSync provides a complete local-first sync layer for Flutter:
 - Firestore (or replacement) used only for social sync + backup
 - New users can use the app without Firebase account for personal learning
 
+### Phase 7: Peer-to-Peer Sync
+
+- Optional P2P transport alongside Firestore for device-to-device changeset exchange
+- mDNS/Bonjour discovery on LAN, QR code pairing for trust establishment
+- Tombstone lifecycle changes: retention-based purge (default 90 days) replaces
+  hub-mediated purge to support mesh topologies
+- Self-hosted relay option for organizations requiring data sovereignty
+- See `P2P_SYNC_ARCHITECTURE.md` for full design
+
 ## References
 
 - Ink & Switch: "Local-First Software" — foundational paper on the philosophy
