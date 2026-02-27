@@ -17,6 +17,7 @@ import '../../providers/gap_analysis_provider.dart';
 import '../../providers/active_concepts_provider.dart';
 import '../../providers/glow_node_provider.dart';
 import '../../providers/narration_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../../services/narration_service.dart';
 import '../widgets/narration_controls.dart';
 import '../../providers/graph_structure_provider.dart';
@@ -720,6 +721,23 @@ class _NarrateButton extends ConsumerWidget {
   }
 
   void _startNarration(BuildContext context, WidgetRef ref) {
+    final config = ref.read(settingsProvider);
+    if (!config.isAnthropicConfigured || !config.isElevenLabsConfigured) {
+      final missing = <String>[];
+      if (!config.isAnthropicConfigured) missing.add('Anthropic');
+      if (!config.isElevenLabsConfigured) missing.add('ElevenLabs');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Narration requires ${missing.join(' and ')} API '
+            '${missing.length == 1 ? 'key' : 'keys'}. '
+            'Configure in Settings.',
+          ),
+        ),
+      );
+      return;
+    }
+
     final concepts = graph.concepts
         .map((c) => ConceptSummary(id: c.id, name: c.name))
         .toList();

@@ -1,6 +1,8 @@
 import 'package:anthropic_sdk_dart/anthropic_sdk_dart.dart';
 import 'package:meta/meta.dart';
 
+import 'retry.dart';
+
 /// Summary of a concept for the narration prompt.
 @immutable
 class ConceptSummary {
@@ -97,26 +99,28 @@ class NarrationService {
               .map((r) => '- ${r.fromName} --${r.label}--> ${r.toName}')
               .join('\n');
 
-    final response = await _client.createMessage(
-      request: CreateMessageRequest(
-        model: Model.modelId(_model),
-        maxTokens: 4096,
-        system: const CreateMessageRequestSystem.text(_systemPrompt),
-        tools: [_narrationTool],
-        toolChoice: const ToolChoice(
-          type: ToolChoiceType.tool,
-          name: _toolName,
-        ),
-        messages: [
-          Message(
-            role: MessageRole.user,
-            content: MessageContent.text(
-              'Generate a narration script for these concepts:\n\n'
-              'Concepts:\n$conceptList\n\n'
-              'Relationships:\n$relationshipList',
-            ),
+    final response = await retryWithBackoff(
+      () => _client.createMessage(
+        request: CreateMessageRequest(
+          model: Model.modelId(_model),
+          maxTokens: 4096,
+          system: const CreateMessageRequestSystem.text(_systemPrompt),
+          tools: [_narrationTool],
+          toolChoice: const ToolChoice(
+            type: ToolChoiceType.tool,
+            name: _toolName,
           ),
-        ],
+          messages: [
+            Message(
+              role: MessageRole.user,
+              content: MessageContent.text(
+                'Generate a narration script for these concepts:\n\n'
+                'Concepts:\n$conceptList\n\n'
+                'Relationships:\n$relationshipList',
+              ),
+            ),
+          ],
+        ),
       ),
     );
 

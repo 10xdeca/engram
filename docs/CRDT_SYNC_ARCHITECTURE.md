@@ -15,7 +15,7 @@ The key insight: **Engram's knowledge graph operations are overwhelmingly additi
 │  Device A (phone)                               │
 │  ┌───────────┐  ┌────────────────────────────┐  │
 │  │ Drift/SQL │←→│ CRDT merge layer (HLC)     │──┼──┐
-│  │ (local)   │  │ sqlite_crdt / custom       │  │  │
+│  │ (local)   │  │ custom CRDT layer (HLC+LWW)       │  │  │
 │  └───────────┘  └────────────────────────────┘  │  │
 └─────────────────────────────────────────────────┘  │
                                                       │ background sync
@@ -23,7 +23,7 @@ The key insight: **Engram's knowledge graph operations are overwhelmingly additi
 │  Device B (laptop)                              │  │
 │  ┌───────────┐  ┌────────────────────────────┐  │  │
 │  │ Drift/SQL │←→│ CRDT merge layer (HLC)     │──┼──┤
-│  │ (local)   │  │ sqlite_crdt / custom       │  │  │
+│  │ (local)   │  │ custom CRDT layer (HLC+LWW)       │  │  │
 │  └───────────┘  └────────────────────────────┘  │  │
 └─────────────────────────────────────────────────┘  │
                                                       │
@@ -48,7 +48,7 @@ The key insight: **Engram's knowledge graph operations are overwhelmingly additi
 |------|-----------|---------------|-----------|
 | Concepts | G-Set (grow-only) | Union | Concepts are added, rarely deleted. Two devices adding different concepts merge cleanly. |
 | Relationships | G-Set | Union | Additive. Two devices creating different relationships merge cleanly. |
-| Quiz Items | G-Set + LWW-Register | Union for creation, last-write-wins for scheduling fields | New items merge by union. Scheduling state (easeFactor, interval, etc.) uses the most recent review timestamp. |
+| Quiz Items | G-Set + LWW-Register | Union for creation, last-write-wins for scheduling fields | New items merge by union. Scheduling state (difficulty, stability, fsrsState, lapses) uses the most recent review timestamp. |
 | Sub-concept splits | G-Set | Union | Splitting creates new concepts + relationships — purely additive. |
 | Document metadata | G-Set | Union | Ingested documents are append-only. |
 | Concept embeddings | LWW-Register per concept | Latest extraction wins | Embeddings are recomputed on re-extraction; latest version is correct. |
@@ -137,8 +137,8 @@ For social features specifically, the server also:
 
 User reviews quiz item `q1` on phone (rating: 4) and laptop (rating: 2) before syncing.
 
-- Phone: `q1.easeFactor = 2.6, interval = 10, lastReview = hlc_phone_5pm`
-- Laptop: `q1.easeFactor = 2.18, interval = 1, lastReview = hlc_laptop_5:01pm`
+- Phone: `q1.difficulty = 5.0, stability = 10.0, fsrsState = 2, lastReview = hlc_phone_5pm`
+- Laptop: `q1.difficulty = 6.2, stability = 1.0, fsrsState = 1, lastReview = hlc_laptop_5:01pm`
 
 LWW-Register resolves: laptop's HLC is later, so laptop's scheduling state wins. This is correct — the most recent review should determine the scheduling state.
 
@@ -169,7 +169,7 @@ User is offline for 3 weeks, reviews 200 quiz items. Reconnects.
 
 ## Implementation Options
 
-### Option A: `sqlite_crdt` + `crdt_sync` (Recommended)
+### Option A: `sqlite_crdt` + `crdt_sync`
 
 Daniel Cachapa's `sqlite_crdt` package provides:
 - SQLite tables with automatic HLC timestamps
@@ -182,7 +182,7 @@ The `crdt_sync` companion handles the transport layer.
 **Pros**: Purpose-built for this use case, proven in production, Dart-native.
 **Cons**: May need adaptation to work cleanly with Drift's type-safe query builder.
 
-### Option B: Custom CRDT Layer on Drift
+### Option B: Custom CRDT Layer on Drift (Implemented)
 
 Build a thin CRDT layer on top of Drift tables:
 - Add `hlc TEXT` column to every table
