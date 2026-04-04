@@ -4,6 +4,7 @@ import 'package:engram/src/models/quiz_item.dart';
 import 'package:engram/src/providers/knowledge_graph_provider.dart';
 import 'package:engram/src/providers/settings_provider.dart';
 import 'package:engram/src/ui/screens/quiz_screen.dart';
+import 'package:engram/src/ui/widgets/swipeable_quiz_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -129,6 +130,66 @@ void main() {
 
       expect(find.text('Full Session'), findsOneWidget);
     });
+
+    testWidgets(
+      'desktop does not show SwipeableQuizCard',
+      variant: const TargetPlatformVariant({TargetPlatform.macOS}),
+      (tester) async {
+        await tester.pumpWidget(await buildApp(graphWithDueItems(1)));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Full Session'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Reveal Answer'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(SwipeableQuizCard), findsNothing);
+        // Buttons still work on desktop.
+        expect(find.text('Again'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'mobile shows SwipeableQuizCard on revealed phase',
+      variant: const TargetPlatformVariant({TargetPlatform.iOS}),
+      (tester) async {
+        await tester.pumpWidget(await buildApp(graphWithDueItems(1)));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Full Session'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Reveal Answer'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(SwipeableQuizCard), findsOneWidget);
+        // Buttons still present as fallback.
+        expect(find.text('Again'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'swipe right on mobile completes single-item session',
+      variant: const TargetPlatformVariant({TargetPlatform.iOS}),
+      (tester) async {
+        await tester.pumpWidget(await buildApp(graphWithDueItems(1)));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Full Session'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Reveal Answer'));
+        await tester.pumpAndSettle();
+
+        // Fling right to rate as Good (1000 px/s).
+        await tester.fling(
+          find.byType(SwipeableQuizCard),
+          const Offset(200, 0),
+          1000,
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Session Complete'), findsOneWidget);
+      },
+    );
 
     testWidgets('always shows 4-button FSRS rating bar', (tester) async {
       await tester.pumpWidget(await buildApp(graphWithDueItems(1)));

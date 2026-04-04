@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -13,6 +14,7 @@ import '../widgets/fsrs_rating_bar.dart';
 import '../widgets/quiz_card.dart';
 import '../widgets/session_summary.dart';
 import '../widgets/split_concept_sheet.dart';
+import '../widgets/swipeable_quiz_card.dart';
 
 class QuizScreen extends ConsumerWidget {
   const QuizScreen({super.key});
@@ -253,27 +255,32 @@ class _RevealedView extends ConsumerWidget {
     final item = session.currentItem;
     if (item == null) return const SizedBox.shrink();
 
+    final isMobile = defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.android;
+
+    final quizCard = QuizCard(
+      question: item.question,
+      answer: item.answer,
+      index: session.currentIndex,
+      total: session.totalItems,
+    );
+
+    void onRate(rating) =>
+        ref.read(quizSessionProvider.notifier).rateItem(rating);
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
           Expanded(
             child: Center(
-              child: QuizCard(
-                question: item.question,
-                answer: item.answer,
-                index: session.currentIndex,
-                total: session.totalItems,
-              ),
+              child: isMobile
+                  ? SwipeableQuizCard(onRate: onRate, child: quizCard)
+                  : quizCard,
             ),
           ),
           const SizedBox(height: 16),
-          FsrsRatingBar(
-            onRate:
-                (rating) => ref
-                    .read(quizSessionProvider.notifier)
-                    .rateItem(rating),
-          ),
+          FsrsRatingBar(onRate: onRate),
           const SizedBox(height: 8),
           TextButton.icon(
             onPressed: () => _showSplitSheet(context, ref, item),
