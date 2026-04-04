@@ -75,11 +75,16 @@ class _SwipeableQuizCardState extends State<SwipeableQuizCard>
     return FsrsRating.hard;
   }
 
-  /// Label to preview during drag. For right drags we show a displacement-based
-  /// hint (since we don't know release velocity yet).
-  String _previewLabel(double dragX) {
+  /// Label to preview during drag. For right drags, displacement serves as a
+  /// proxy for velocity zones (small → Hard, medium → Good, large → Easy).
+  /// Not perfectly accurate since the actual rating uses release velocity, but
+  /// gives the user a useful signal about which zone they're approaching.
+  String _previewLabel(double dragX, double cardWidth) {
     if (dragX < 0) return 'Again';
-    return 'Good'; // reasonable default preview for right drag
+    final fraction = dragX / cardWidth;
+    if (fraction <= 0.25) return 'Hard';
+    if (fraction <= 0.45) return 'Good';
+    return 'Easy';
   }
 
   Color _overlayColor(double dragX, double normalizedDrag) {
@@ -241,7 +246,7 @@ class _SwipeableQuizCardState extends State<SwipeableQuizCard>
                           right: 0,
                           child: Center(
                             child: Text(
-                              _previewLabel(offset),
+                              _previewLabel(offset, _cardWidth),
                               style: Theme.of(
                                 context,
                               ).textTheme.titleMedium?.copyWith(

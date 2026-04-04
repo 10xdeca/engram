@@ -175,24 +175,28 @@ void main() {
         await tester.pumpAndSettle();
       });
 
-      testWidgets('right drag shows velocity-appropriate label', (
+      testWidgets('right drag label changes with displacement', (
         tester,
       ) async {
         await _pumpCard(tester, onRate: (_) {});
 
         final center = tester.getCenter(find.byType(SwipeableQuizCard));
         final gesture = await tester.startGesture(center);
-        await gesture.moveBy(const Offset(100, 0));
-        await tester.pump();
 
-        // During a drag (before release), the label should show a right rating.
-        // The specific label depends on how we preview — at minimum, one of
-        // Hard/Good/Easy should be visible.
-        final hasRightLabel =
-            find.text('Hard').evaluate().isNotEmpty ||
-            find.text('Good').evaluate().isNotEmpty ||
-            find.text('Easy').evaluate().isNotEmpty;
-        expect(hasRightLabel, isTrue);
+        // Small right drag (80/400 = 20%) → Hard.
+        await gesture.moveBy(const Offset(80, 0));
+        await tester.pump();
+        expect(find.text('Hard'), findsOneWidget);
+
+        // Medium right drag (140/400 = 35%) → Good.
+        await gesture.moveBy(const Offset(60, 0));
+        await tester.pump();
+        expect(find.text('Good'), findsOneWidget);
+
+        // Large right drag (200/400 = 50%) → Easy.
+        await gesture.moveBy(const Offset(60, 0));
+        await tester.pump();
+        expect(find.text('Easy'), findsOneWidget);
 
         await gesture.up();
         await tester.pumpAndSettle();
