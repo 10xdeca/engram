@@ -104,8 +104,9 @@ class _SwipeableQuizCardState extends State<SwipeableQuizCard>
   }
 
   void _onDragUpdate(DragUpdateDetails details) {
+    final limit = _cardWidth * 0.6;
     setState(() {
-      _dragX += details.delta.dx;
+      _dragX = (_dragX + details.delta.dx).clamp(-limit, limit);
     });
 
     // Haptic when crossing the commitment threshold.
@@ -151,6 +152,10 @@ class _SwipeableQuizCardState extends State<SwipeableQuizCard>
 
     if (_isFlying && _pendingRating != null) {
       final rating = _pendingRating!;
+      // Reset fields before calling onRate — the callback may trigger a
+      // provider state update that rebuilds the tree and disposes this widget.
+      // Field assignments on a disposed State are harmless but confusing to
+      // read, so we do them first.
       _pendingRating = null;
       _isFlying = false;
       _dragX = 0;
