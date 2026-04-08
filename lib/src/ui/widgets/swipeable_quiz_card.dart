@@ -87,9 +87,13 @@ class _SwipeableQuizCardState extends State<SwipeableQuizCard>
     return 'Easy';
   }
 
-  Color _overlayColor(double dragX, double normalizedDrag) {
+  Color _overlayColor(double dragX, double normalizedDrag, double cardWidth) {
     final opacity = normalizedDrag.abs().clamp(0.0, 1.0) * 0.3;
     if (dragX < 0) return Colors.red.withValues(alpha: opacity);
+    // Zone-based color: orange (Hard) → light green (Good) → green (Easy).
+    final fraction = dragX / cardWidth;
+    if (fraction <= 0.25) return Colors.orange.withValues(alpha: opacity);
+    if (fraction <= 0.45) return Colors.lightGreen.withValues(alpha: opacity);
     return Colors.green.withValues(alpha: opacity);
   }
 
@@ -104,7 +108,7 @@ class _SwipeableQuizCardState extends State<SwipeableQuizCard>
   }
 
   void _onDragUpdate(DragUpdateDetails details) {
-    final limit = _cardWidth * 0.6;
+    final limit = _cardWidth * 0.9;
     setState(() {
       _dragX = (_dragX + details.delta.dx).clamp(-limit, limit);
     });
@@ -237,7 +241,7 @@ class _SwipeableQuizCardState extends State<SwipeableQuizCard>
                           child: IgnorePointer(
                             child: Container(
                               decoration: BoxDecoration(
-                                color: _overlayColor(offset, normalizedDrag),
+                                color: _overlayColor(offset, normalizedDrag, _cardWidth),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
