@@ -6,11 +6,13 @@ import '../../models/quiz_item.dart';
 import '../../models/quiz_session_state.dart';
 import '../../models/session_mode.dart';
 import '../../providers/collection_filter_provider.dart';
+import '../../providers/graph_structure_provider.dart';
 import '../../providers/knowledge_graph_provider.dart';
 import '../../providers/quiz_session_provider.dart';
 import '../../providers/split_concept_provider.dart';
 import '../../providers/topic_provider.dart';
 import '../widgets/fsrs_rating_bar.dart';
+import '../widgets/neighborhood_graph.dart';
 import '../widgets/quiz_card.dart';
 import '../widgets/session_summary.dart';
 import '../widgets/split_concept_sheet.dart';
@@ -255,6 +257,7 @@ class _RevealedView extends ConsumerWidget {
     final item = session.currentItem;
     if (item == null) return const SizedBox.shrink();
 
+    final graph = ref.watch(graphStructureProvider);
     final isMobile = defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.android;
 
@@ -280,6 +283,14 @@ class _RevealedView extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
+          if (graph != null)
+            Flexible(
+              child: NeighborhoodGraph(
+                conceptId: item.conceptId,
+                graph: graph,
+              ),
+            ),
+          const SizedBox(height: 8),
           FsrsRatingBar(onRate: onRate),
           const SizedBox(height: 8),
           TextButton.icon(
