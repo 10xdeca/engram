@@ -121,7 +121,7 @@ The parallel to our other project makes this concrete: we're also building [Engr
 
 ## Early Results: Surprise Wins on Efficiency, Write-Everything Collapses
 
-We ran the surprise-gating hypothesis through [D-MEM](https://arxiv.org/abs/2603.14597)'s ablation protocol on the [LoCoMo](https://aclanthology.org/2024.acl-long.514/) benchmark — 10 multi-session conversations with 1,986 QA pairs across five difficulty categories (multi-hop, single-hop, temporal, open-domain, adversarial).
+We ran the surprise-gating hypothesis through [D-MEM](https://arxiv.org/abs/2603.14597)'s ablation protocol on the [LoCoMo](https://aclanthology.org/2024.acl-long.747/) benchmark — 10 multi-session conversations with 1,986 QA pairs across five difficulty categories (multi-hop, single-hop, temporal, open-domain, adversarial).
 
 Four conditions, same evaluation, same LLM:
 
