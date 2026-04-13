@@ -36,7 +36,7 @@ Every domain independently arrived at the same gating mechanism for what should 
 
 - **ML**: "Write to memory only when prediction error exceeds a threshold, mirroring dopamine-gated consolidation" (Memory-Augmented Transformers survey, 2025)
 - **Neuroscience**: The amygdala tags surprising and emotional moments for preferential processing during sleep (Wagner, Payne)
-- **Information Theory**: The Information Bottleneck method (Tishby, 2000) retains what has high predictive value — which is the surprising stuff, by definition
+- **Information Theory**: The Information Bottleneck method (Tishby, 1999) retains what has high predictive value — which is the surprising stuff, by definition
 - **Cognitive Psychology**: Elaborative interrogation only improves retention when prior knowledge exists to be *violated* (Pressley, McDaniel)
 
 Asking "is this important?" is the wrong question. Importance is subjective and biased toward what the schema already values. Asking "was I surprised?" captures importance *and* catches the things importance-gating misses: quiet schema violations, subtle corrections, things that didn't fit but got assimilated anyway.
@@ -73,9 +73,9 @@ Instead of three autonomous agents processing session artifacts, consolidation n
 
 1. **"What surprised us today?"** — The surprise gate. If nothing surprised either of us, the session was pure execution and consolidation can be lightweight.
 
-2. **"Why did that work / not work?"** — Elaborative interrogation (Pressley, d=0.56) combined with double-loop reflection (Argyris). Not "what happened" but "what governing assumption produced this outcome?"
+2. **"Why did that work / not work?"** — Elaborative interrogation (Pressley) combined with double-loop reflection (Argyris). Not "what happened" but "what governing assumption produced this outcome?"
 
-3. **"What would you tell the next version of yourself?"** — The generation effect (Slamecka & Graf, 1978, d=0.40). Generating advice forces reconstruction, which produces stronger encoding than extraction.
+3. **"What would you tell the next version of yourself?"** — The generation effect (Slamecka & Graf, 1978). Generating advice forces reconstruction, which produces stronger encoding than extraction.
 
 4. **"What did I get wrong today?"** — Error triage in dialogue. Each mistake gets classified: TRANSFORM (extract the lesson, discard the episode), ABSORB (existing memory covers it), or DISCARD (purely situational). This is backed by Kim et al. (PNAS, 2014) — the brain actively prunes memories that prove inaccurate.
 
@@ -91,7 +91,7 @@ The research produced more than just the conversation-first insight. Three other
 
 ### Memory Health Tracking
 
-Every memory file now has a decay class — `volatile` (1-2 sessions), `seasonal` (weeks-months), `durable` (months-years), or `permanent`. This is backed by Argote's knowledge depreciation research (1999), Benna & Fusi's cascade model (2016, *Nature Neuroscience*) showing O(√N) optimal scaling with multi-timescale memory, and FSRS spaced repetition scheduling.
+Every memory file now has a decay class — `volatile` (1-2 sessions), `seasonal` (weeks-months), `durable` (months-years), or `permanent`. This is backed by Argote's knowledge depreciation research (1999), Benna & Fusi's cascade model (2016, *Nature Neuroscience*) showing near-optimal memory retention with multi-timescale synapses, and FSRS spaced repetition scheduling.
 
 Stale memories get flagged. The system doesn't just accumulate — it actively manages decay.
 
