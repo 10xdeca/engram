@@ -140,7 +140,7 @@ Three findings:
 
 **Surprise-gating wins on the hardest questions.** On multi-hop reasoning (cross-session connections), surprise-gating scored 0.157 vs 0.151 (importance) and 0.146 (combined). The questions that require connecting ideas across contexts are exactly where novelty-based filtering has an edge.
 
-*These are preliminary results from a single LoCoMo sample (419 turns, 199 QA pairs). Full 10-sample results with noise injection coming soon — but the direction is clear and the efficiency gap is enormous.*
+*These are preliminary results from a single LoCoMo sample (419 turns, 199 QA pairs). Full 10-sample results with noise injection coming soon — but the direction is clear and the efficiency gap is enormous. [Experiment code and reproduction instructions](https://github.com/enspyrco/memory-consolidation-experiment).*
 
 ### What We Still Need To Prove
 
