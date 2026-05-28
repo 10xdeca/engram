@@ -5,6 +5,7 @@ import '../../models/dashboard_stats.dart';
 import '../../models/knowledge_gap.dart';
 import '../../models/knowledge_graph.dart';
 import '../../models/narration_session.dart';
+import '../../models/network_health.dart';
 import '../../models/stale_document.dart';
 import '../../models/sync_status.dart';
 import '../../engine/difficulty_evaluation.dart';
@@ -305,12 +306,14 @@ class _DashboardContent extends ConsumerWidget {
             right: 12,
             child: _NarrateButton(graph: graph),
           ),
-        // Compact stats bar at bottom
+        // Persistent insights panel at bottom — always-visible summary of the
+        // rich feature-set (curiosity gaps, health, due), expandable to the
+        // full stats/health/curiosity detail cards.
         Positioned(
           bottom: 0,
           left: 0,
           right: 0,
-          child: _CompactStatsBar(
+          child: _InsightsPanel(
             conceptCount: stats.concepts,
             masteredCount: stats.mastered,
             dueCount: stats.due,
@@ -366,12 +369,23 @@ class _CollectionChipBar extends ConsumerWidget {
   }
 }
 
-/// Semi-transparent stats bar at the bottom of the dashboard.
+/// Persistent, expandable insights panel anchored to the bottom of the
+/// dashboard.
 ///
-/// Shows filtered stats (matching the selected collection). The info button
-/// opens a bottom sheet with full global stats from [dashboardStatsProvider].
-class _CompactStatsBar extends StatelessWidget {
-  const _CompactStatsBar({
+/// Collapsed (default): an always-visible summary giving information scent for
+/// the rich feature-set — curiosity gaps + a Scan action, network-health %,
+/// items due, and concept/mastered counts. Previously these features were
+/// hidden behind an easily-missed `info_outline` button.
+///
+/// Expanded: the full detail cards (stats, mastery, health, repair missions,
+/// prediction accuracy, curiosity engine, graph status) inline, scrolling
+/// within a height-capped region so the graph stays visible behind it.
+///
+/// The collapsed summary uses filtered stats (matching the selected
+/// collection); graph-wide signals (health, gaps) come from their own
+/// providers.
+class _InsightsPanel extends ConsumerStatefulWidget {
+  const _InsightsPanel({
     required this.conceptCount,
     required this.masteredCount,
     required this.dueCount,
@@ -382,26 +396,173 @@ class _CompactStatsBar extends StatelessWidget {
   final int dueCount;
 
   @override
+  ConsumerState<_InsightsPanel> createState() => _InsightsPanelState();
+}
+
+class _InsightsPanelState extends ConsumerState<_InsightsPanel> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final health = ref.watch(networkHealthProvider);
+    final gaps = ref.watch(gapAnalysisProvider);
+    final recState = ref.watch(recommendationProvider);
 
-    return Container(
-      color: theme.scaffoldBackgroundColor.withValues(alpha: 0.85),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    return Material(
+      color: theme.scaffoldBackgroundColor.withValues(alpha: 0.92),
+      elevation: _expanded ? 8 : 0,
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        alignment: Alignment.bottomCenter,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _CuriositySummaryRow(gaps: gaps, recState: recState),
+            _StatsSummaryRow(
+              health: health,
+              dueCount: widget.dueCount,
+              conceptCount: widget.conceptCount,
+              masteredCount: widget.masteredCount,
+              expanded: _expanded,
+              onToggle: () => setState(() => _expanded = !_expanded),
+            ),
+            if (_expanded) const _InsightsDetail(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Collapsed row 1: curiosity-engine scent + Scan action + top pick.
+class _CuriositySummaryRow extends ConsumerWidget {
+  const _CuriositySummaryRow({required this.gaps, required this.recState});
+
+  final List<KnowledgeGap> gaps;
+  final RecommendationState recState;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final topRec = recState.recommendations.isNotEmpty
+        ? recState.recommendations.first
+        : null;
+    final scanning =
+        recState.phase != RecommendationPhase.idle &&
+        recState.phase != RecommendationPhase.done &&
+        recState.phase != RecommendationPhase.error;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
       child: Row(
         children: [
-          _statChip(Icons.lightbulb, '$conceptCount'),
-          const SizedBox(width: 16),
-          _statChip(Icons.check_circle, '$masteredCount'),
-          const SizedBox(width: 16),
-          _statChip(Icons.schedule, '$dueCount'),
-          const Spacer(),
+          Icon(Icons.bolt, size: 18, color: theme.colorScheme.primary),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              topRec != null
+                  ? 'Top pick: ${topRec.documentTitle}'
+                  : gaps.isEmpty
+                  ? 'Curiosity Engine — no gaps detected'
+                  : '${gaps.length} gap${gaps.length == 1 ? '' : 's'} in your '
+                      'knowledge graph',
+              style: theme.textTheme.bodySmall,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          if (scanning)
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            TextButton.icon(
+              onPressed: () =>
+                  ref.read(recommendationProvider.notifier).findRecommendations(),
+              icon: const Icon(Icons.search, size: 16),
+              label: const Text('Scan'),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
           IconButton(
-            icon: const Icon(Icons.info_outline, size: 20),
-            tooltip: 'Full stats',
-            onPressed: () => _showStatsSheet(context),
+            icon: const Icon(Icons.explore, size: 18),
+            tooltip: 'Explore recommendations',
+            visualDensity: VisualDensity.compact,
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const RecommendationsScreen(),
+              ),
+            ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Collapsed row 2: health %, due count, concept/mastered chips, expand toggle.
+class _StatsSummaryRow extends StatelessWidget {
+  const _StatsSummaryRow({
+    required this.health,
+    required this.dueCount,
+    required this.conceptCount,
+    required this.masteredCount,
+    required this.expanded,
+    required this.onToggle,
+  });
+
+  final NetworkHealth health;
+  final int dueCount;
+  final int conceptCount;
+  final int masteredCount;
+  final bool expanded;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final healthColor = _colorForTier(health.tier);
+    final healthPct = (health.score * 100).round();
+
+    return InkWell(
+      onTap: onToggle,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 8, 8),
+        child: Row(
+          children: [
+            Icon(Icons.favorite, size: 16, color: healthColor),
+            const SizedBox(width: 4),
+            Text(
+              '$healthPct%',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: healthColor,
+              ),
+            ),
+            const SizedBox(width: 16),
+            _statChip(Icons.schedule, '$dueCount due'),
+            const SizedBox(width: 16),
+            _statChip(Icons.lightbulb, '$conceptCount'),
+            const SizedBox(width: 16),
+            _statChip(Icons.check_circle, '$masteredCount'),
+            const Spacer(),
+            Text(
+              expanded ? 'Less' : 'Details',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            Icon(
+              expanded ? Icons.expand_more : Icons.expand_less,
+              size: 20,
+              color: Colors.grey,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -417,17 +578,26 @@ class _CompactStatsBar extends StatelessWidget {
     );
   }
 
-  void _showStatsSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      builder: (_) => const _StatsBottomSheet(),
-    );
+  static Color _colorForTier(HealthTier tier) {
+    switch (tier) {
+      case HealthTier.healthy:
+        return const Color(0xFF4CAF50);
+      case HealthTier.brownout:
+        return const Color(0xFFFFC107);
+      case HealthTier.cascade:
+        return const Color(0xFFFF9800);
+      case HealthTier.fracture:
+        return const Color(0xFFF44336);
+      case HealthTier.collapse:
+        return const Color(0xFF9E9E9E);
+    }
   }
 }
 
-/// Bottom sheet with the full stats, mastery bar, health, and graph status.
-class _StatsBottomSheet extends ConsumerWidget {
-  const _StatsBottomSheet();
+/// Expanded detail: the full set of feature cards, scrolling within a
+/// height-capped region so the graph remains partly visible behind it.
+class _InsightsDetail extends ConsumerWidget {
+  const _InsightsDetail();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -437,80 +607,67 @@ class _StatsBottomSheet extends ConsumerWidget {
     final evaluation = ref.watch(difficultyEvaluationProvider);
     final gaps = ref.watch(gapAnalysisProvider);
     final recState = ref.watch(recommendationProvider);
+    final maxHeight = MediaQuery.of(context).size.height * 0.55;
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.6,
-      minChildSize: 0.3,
-      maxChildSize: 0.9,
-      expand: false,
-      builder: (context, scrollController) {
-        return ListView(
-          controller: scrollController,
-          padding: const EdgeInsets.all(16),
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade400,
-                  borderRadius: BorderRadius.circular(2),
-                ),
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: ListView(
+        shrinkWrap: true,
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        children: [
+          const Divider(height: 1),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              StatCard(
+                label: 'Documents',
+                value: '${stats.documentCount}',
+                icon: Icons.description,
               ),
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                StatCard(
-                  label: 'Documents',
-                  value: '${stats.documentCount}',
-                  icon: Icons.description,
-                ),
-                StatCard(
-                  label: 'Concepts',
-                  value: '${stats.conceptCount}',
-                  icon: Icons.lightbulb,
-                ),
-                StatCard(
-                  label: 'Relationships',
-                  value: '${stats.relationshipCount}',
-                  icon: Icons.share,
-                ),
-                StatCard(
-                  label: 'Quiz Items',
-                  value: '${stats.quizItemCount}',
-                  icon: Icons.quiz,
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            MasteryBar(
-              newCount: stats.newCount,
-              learningCount: stats.learningCount,
-              masteredCount: stats.masteredCount,
-            ),
-            const SizedBox(height: 16),
-            NetworkHealthIndicator(health: health),
-            for (final mission in catastrophe.activeMissions)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: RepairMissionCard(mission: mission),
+              StatCard(
+                label: 'Concepts',
+                value: '${stats.conceptCount}',
+                icon: Icons.lightbulb,
               ),
-            if (evaluation.evaluatedCount > 0) ...[
-              const SizedBox(height: 16),
-              _PredictionAccuracyCard(evaluation: evaluation),
+              StatCard(
+                label: 'Relationships',
+                value: '${stats.relationshipCount}',
+                icon: Icons.share,
+              ),
+              StatCard(
+                label: 'Quiz Items',
+                value: '${stats.quizItemCount}',
+                icon: Icons.quiz,
+              ),
             ],
-            if (gaps.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              _CuriosityCard(gaps: gaps, recState: recState),
-            ],
+          ),
+          const SizedBox(height: 16),
+          MasteryBar(
+            newCount: stats.newCount,
+            learningCount: stats.learningCount,
+            masteredCount: stats.masteredCount,
+          ),
+          const SizedBox(height: 16),
+          NetworkHealthIndicator(health: health),
+          for (final mission in catastrophe.activeMissions)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: RepairMissionCard(mission: mission),
+            ),
+          if (evaluation.evaluatedCount > 0) ...[
             const SizedBox(height: 16),
-            _GraphStatusCard(stats: stats),
+            _PredictionAccuracyCard(evaluation: evaluation),
           ],
-        );
-      },
+          // Curiosity Engine is the centerpiece feature — always render it
+          // (even with zero gaps) so it is never invisible.
+          const SizedBox(height: 16),
+          _CuriosityCard(gaps: gaps, recState: recState),
+          const SizedBox(height: 16),
+          _GraphStatusCard(stats: stats),
+        ],
+      ),
     );
   }
 }
