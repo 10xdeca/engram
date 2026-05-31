@@ -239,7 +239,18 @@ class EngramDatabase extends _$EngramDatabase {
       );
 
   /// Opens the default on-disk database using drift_flutter.
+  ///
+  /// The [web] options are required when compiling to the web: drift loads the
+  /// sqlite3 WASM module and its background worker from assets in `web/`. They
+  /// are ignored on native platforms (macOS/iOS/Android), so passing them
+  /// unconditionally is safe.
   static QueryExecutor _openDefault() {
-    return driftDatabase(name: 'engram');
+    return driftDatabase(
+      name: 'engram',
+      web: DriftWebOptions(
+        sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+        driftWorker: Uri.parse('drift_worker.js'),
+      ),
+    );
   }
 }
