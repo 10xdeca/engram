@@ -138,18 +138,41 @@
         }, p.at);
       });
 
-      // Hide splash as soon as Flutter inserts its view (first-frame proxy).
-      var observer = new MutationObserver(function () {
-        if (document.querySelector('flutter-view')) {
-          var splash = document.getElementById('splash');
-          if (splash) splash.classList.add('hide');
-          timers.forEach(clearTimeout);
-          observer.disconnect();
-          // Remove from DOM after the fade completes so it can't intercept input.
-          setTimeout(function () { if (splash && splash.parentNode) splash.parentNode.removeChild(splash); }, 500);
+      function hideSplash(reason) {
+        var splash = document.getElementById('splash');
+        if (!splash || splash.classList.contains('hide')) return;
+        if (window.console) console.log('[splash] hiding:', reason);
+        splash.classList.add('hide');
+        timers.forEach(clearTimeout);
+        observer.disconnect();
+        // Remove after fade so it can't intercept input.
+        setTimeout(function () { if (splash.parentNode) splash.parentNode.removeChild(splash); }, 500);
+      }
+
+      // Hide as soon as Flutter inserts any of its host elements. The exact
+      // tag name has churned across Flutter versions (flutter-view,
+      // flt-glass-pane, flt-scene-host), so match by prefix instead of one
+      // specific name.
+      var observer = new MutationObserver(function (mutations) {
+        for (var i = 0; i < mutations.length; i++) {
+          var added = mutations[i].addedNodes;
+          for (var j = 0; j < added.length; j++) {
+            var n = added[j];
+            if (n.nodeType !== 1) continue;
+            var t = n.tagName ? n.tagName.toLowerCase() : '';
+            if (t.indexOf('flt-') === 0 || t.indexOf('flutter-') === 0) {
+              hideSplash('flutter element <' + t + '> mounted');
+              return;
+            }
+          }
         }
       });
       observer.observe(document.body, { childList: true, subtree: true });
+
+      // Safety net: never leave the user permanently stuck behind the splash.
+      // If Flutter painted but the observer missed it for some reason, the
+      // user will at least see whatever's there.
+      setTimeout(function () { hideSplash('timeout (25s)'); }, 25000);
     })();
   </script>
 
