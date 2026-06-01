@@ -1,1 +1,74 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"engram-26a3a","appId":"1:593793808284:android:bc2683e1816b61f2b0ba59","fileOutput":"android/app/google-services.json"}},"ios":{"default":{"projectId":"engram-26a3a","appId":"1:593793808284:ios:8c647ab5e614a11db0ba59","uploadDebugSymbols":false,"fileOutput":"ios/Runner/GoogleService-Info.plist"}},"macos":{"default":{"projectId":"engram-26a3a","appId":"1:593793808284:ios:8c647ab5e614a11db0ba59","uploadDebugSymbols":false,"fileOutput":"macos/Runner/GoogleService-Info.plist"}},"dart":{"lib/firebase_options.dart":{"projectId":"engram-26a3a","configurations":{"android":"1:593793808284:android:bc2683e1816b61f2b0ba59","ios":"1:593793808284:ios:8c647ab5e614a11db0ba59","macos":"1:593793808284:ios:8c647ab5e614a11db0ba59","web":"1:593793808284:web:2bb46b425d96dfddb0ba59"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "engram-26a3a",
+          "appId": "1:593793808284:android:bc2683e1816b61f2b0ba59",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "engram-26a3a",
+          "appId": "1:593793808284:ios:8c647ab5e614a11db0ba59",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "macos": {
+        "default": {
+          "projectId": "engram-26a3a",
+          "appId": "1:593793808284:ios:8c647ab5e614a11db0ba59",
+          "uploadDebugSymbols": false,
+          "fileOutput": "macos/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "engram-26a3a",
+          "configurations": {
+            "android": "1:593793808284:android:bc2683e1816b61f2b0ba59",
+            "ios": "1:593793808284:ios:8c647ab5e614a11db0ba59",
+            "macos": "1:593793808284:ios:8c647ab5e614a11db0ba59",
+            "web": "1:593793808284:web:2bb46b425d96dfddb0ba59"
+          }
+        }
+      }
+    }
+  },
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(js|css|woff2|wasm|png|jpg|svg|ico)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=31536000, immutable"
+          }
+        ]
+      },
+      {
+        "source": "/index.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -23,7 +23,13 @@ void main() {
           const NetworkHealth(score: 1.0, tier: HealthTier.healthy),
         ),
       ],
-      child: const MaterialApp(home: DashboardScreen()),
+      // NoSplash avoids loading the ink_sparkle fragment shader, which the
+      // widget-test harness cannot decode. Tapping the InkWell-based panel
+      // toggle would otherwise throw.
+      child: MaterialApp(
+        theme: ThemeData(splashFactory: NoSplash.splashFactory),
+        home: const DashboardScreen(),
+      ),
     );
   }
 
@@ -72,13 +78,14 @@ void main() {
       await tester.pumpWidget(buildApp(graph));
       await tester.pumpAndSettle();
 
-      // Compact stats bar shows concept count (2) in the bottom bar
+      // Insights panel shows concept count (2) in the collapsed summary row
       expect(find.text('2'), findsOneWidget); // concept count
-      // Info button is visible for opening full stats
-      expect(find.byIcon(Icons.info_outline), findsOneWidget);
+      // The Details toggle is visible for expanding the full feature cards
+      expect(find.text('Details'), findsOneWidget);
+      expect(find.byIcon(Icons.expand_less), findsOneWidget);
     });
 
-    testWidgets('info button opens bottom sheet with full stats', (
+    testWidgets('Details toggle expands the insights panel inline', (
       tester,
     ) async {
       final graph = KnowledgeGraph(
@@ -103,15 +110,15 @@ void main() {
       await tester.pumpWidget(buildApp(graph));
       await tester.pumpAndSettle();
 
-      // Tap info button to open bottom sheet
-      await tester.tap(find.byIcon(Icons.info_outline));
+      // Tap the Details toggle to expand the panel inline
+      await tester.tap(find.text('Details'));
       await tester.pumpAndSettle();
 
-      // Stat cards near top of bottom sheet should be visible immediately
+      // Stat cards in the expanded detail should be visible immediately
       expect(find.text('Documents'), findsOneWidget);
       expect(find.text('Concepts'), findsOneWidget);
 
-      // Scroll down within the bottom sheet to find Graph Status
+      // Scroll down within the expanded detail to find Graph Status
       await tester.scrollUntilVisible(
         find.text('Graph Status'),
         50,
