@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -28,9 +29,13 @@ Future<void> main() async {
     return true;
   }());
 
-  // Initialize notification service
-  final notificationService = NotificationService();
-  await notificationService.initialize();
+  // Initialize notification service. flutter_local_notifications has no web
+  // implementation; calling initialize() on web hangs main() before runApp,
+  // which manifests as an indefinite black screen with no console error.
+  if (!kIsWeb) {
+    final notificationService = NotificationService();
+    await notificationService.initialize();
+  }
 
   // Open the local Drift/SQLite database (used for unauthenticated/offline
   // graph storage, replacing the old JSON file approach).
