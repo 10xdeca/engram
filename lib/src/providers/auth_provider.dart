@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
@@ -31,11 +31,47 @@ final googleSignInProvider = Provider<GoogleSignIn>((ref) {
 /// Signs in with Google. Returns the Firebase [User] or null on cancel.
 ///
 /// Google always provides displayName, email, and photoUrl on every sign-in.
+///
+/// **Platform split:** on web, [GoogleSignIn.signIn] is deprecated and
+/// cannot reliably return an ID token (google_sign_in_web v0.12 uses GIS,
+/// which only hands back access tokens via the popup flow). The previous
+/// path completed Google's popup but Firebase never received a credential,
+/// leaving the app on a white screen. On web we go directly through
+/// [FirebaseAuth.signInWithPopup], which speaks GIS and mints the Firebase
+/// credential server-side. Native platforms keep the original flow because
+/// `signInWithPopup` is web-only.
 Future<User?> signInWithGoogle(
   FirebaseAuth auth, {
   required FirebaseFirestore firestore,
   required GoogleSignIn googleSignIn,
 }) async {
+  if (kIsWeb) {
+    final provider = GoogleAuthProvider()
+      ..addScope('email')
+      ..addScope('profile');
+    final UserCredential userCredential;
+    try {
+      userCredential = await auth.signInWithPopup(provider);
+    } on FirebaseAuthException catch (e) {
+      // User dismissed the popup — treat as cancellation, not failure.
+      if (e.code == 'popup-closed-by-user' ||
+          e.code == 'cancelled-popup-request') {
+        return null;
+      }
+      rethrow;
+    }
+    final user = userCredential.user;
+    if (user == null) return null;
+    await _writeProfile(
+      firestore: firestore,
+      uid: user.uid,
+      displayName: user.displayName ?? 'User',
+      email: user.email,
+      photoUrl: user.photoURL,
+    );
+    return user;
+  }
+
   final googleUser = await googleSignIn.signIn();
   if (googleUser == null) return null; // User cancelled
 

@@ -38,8 +38,144 @@
 
   <title>engram</title>
   <link rel="manifest" href="manifest.json">
+
+  <!--
+    Branded boot splash. Flutter web's debug build loads ~1200 DDC module
+    scripts before painting its first frame, leaving an unstyled white page
+    for several seconds. This splash renders immediately from static HTML so
+    the user sees a branded loading state instead, with a rotating status
+    message that names the current phase. It hides itself when Flutter
+    inserts <flutter-view> into the body (the unambiguous "first frame"
+    signal in bootstrap.js 3.22+, which has no documented ready callback).
+  -->
+  <style>
+    :root {
+      --splash-bg: #f8f4ff;
+      --splash-fg: #1a1a2e;
+      --splash-muted: #6b6b8a;
+      --splash-accent: #7c6cdf;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --splash-bg: #0d0d12;
+        --splash-fg: #e8e6f0;
+        --splash-muted: #8a8aa3;
+      }
+    }
+    html, body { margin: 0; padding: 0; height: 100%; background: var(--splash-bg); }
+    #splash {
+      position: fixed; inset: 0; z-index: 9999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: var(--splash-bg); color: var(--splash-fg);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      transition: opacity 400ms ease-out;
+    }
+    #splash.hide { opacity: 0; pointer-events: none; }
+    #splash-icon {
+      width: 80px; height: 80px; margin-bottom: 24px;
+      color: var(--splash-accent);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 0.9; }
+      50%      { transform: scale(1.06); opacity: 1; }
+    }
+    #splash-title {
+      font-size: 32px; font-weight: 500; margin: 0 0 6px 0;
+      letter-spacing: -0.5px;
+    }
+    #splash-status {
+      font-size: 14px; color: var(--splash-muted); margin: 0 0 32px 0;
+      min-height: 20px; transition: opacity 200ms ease-out;
+    }
+    #splash-bar {
+      width: 220px; height: 3px; border-radius: 2px;
+      background: rgba(124, 108, 223, 0.15); overflow: hidden; position: relative;
+    }
+    #splash-bar::after {
+      content: ''; position: absolute; inset: 0; width: 40%;
+      background: var(--splash-accent); border-radius: 2px;
+      animation: slide 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+    @keyframes slide {
+      0%   { transform: translateX(-100%); }
+      100% { transform: translateX(350%); }
+    }
+  </style>
 </head>
 <body>
+  <div id="splash" role="status" aria-live="polite">
+    <!-- Inline SVG of Material Icons "psychology" (the head-with-cog icon the
+         sign-in screen uses via Icons.psychology). Inlined so the brand mark
+         paints with the first byte — no asset round-trip — and inherits the
+         splash accent colour via currentColor. -->
+    <svg id="splash-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+         fill="currentColor" aria-hidden="true">
+      <path d="M13 8.57c-.79 0-1.43.64-1.43 1.43s.64 1.43 1.43 1.43 1.43-.64 1.43-1.43-.64-1.43-1.43-1.43z"/>
+      <path d="M13 3C9.25 3 6.2 5.94 6.02 9.64L4.1 12.2c-.25.33-.01.8.4.8H6v3c0 1.1.9 2 2 2h1v3h7v-4.68c2.36-1.12 4-3.53 4-6.32 0-3.87-3.13-7-7-7zm3 7c0 .13-.01.26-.02.39l.83.66c.08.06.1.16.05.25l-.8 1.39c-.05.09-.16.12-.24.09l-.99-.4c-.21.16-.43.29-.67.39L14 13.83c-.01.1-.1.17-.2.17h-1.6c-.1 0-.18-.07-.2-.17l-.15-1.06c-.25-.1-.47-.23-.68-.39l-.99.4c-.09.03-.2 0-.25-.09l-.8-1.39c-.05-.08-.03-.19.05-.25l.84-.66c-.01-.13-.02-.26-.02-.39s.02-.27.04-.39l-.85-.66c-.08-.06-.1-.16-.05-.26l.8-1.38c.05-.09.15-.12.24-.09l1 .4c.2-.15.43-.29.67-.39L12 6.17c.02-.1.1-.17.2-.17h1.6c.1 0 .18.07.2.17l.15 1.06c.24.1.46.23.67.39l1-.4c.09-.03.2 0 .24.09l.8 1.38c.05.09.03.2-.05.26l-.85.66c.03.12.04.25.04.38z"/>
+    </svg>
+    <h1 id="splash-title">Engram</h1>
+    <p id="splash-status">Loading engine…</p>
+    <div id="splash-bar" aria-hidden="true"></div>
+  </div>
+
+  <script>
+    // Rotate status text so the user knows what's happening during the
+    // long debug-build wait. Phases roughly match the actual boot timeline.
+    (function () {
+      var status = document.getElementById('splash-status');
+      var phases = [
+        { at: 0,     text: 'Loading engine…' },
+        { at: 3000,  text: 'Compiling app…' },
+        { at: 8000,  text: 'Loading your knowledge graph…' },
+        { at: 15000, text: 'Almost there…' },
+      ];
+      var timers = phases.slice(1).map(function (p) {
+        return setTimeout(function () {
+          if (!status) return;
+          status.style.opacity = '0';
+          setTimeout(function () { status.textContent = p.text; status.style.opacity = '1'; }, 200);
+        }, p.at);
+      });
+
+      function hideSplash(reason) {
+        var splash = document.getElementById('splash');
+        if (!splash || splash.classList.contains('hide')) return;
+        if (window.console) console.log('[splash] hiding:', reason);
+        splash.classList.add('hide');
+        timers.forEach(clearTimeout);
+        observer.disconnect();
+        // Remove after fade so it can't intercept input.
+        setTimeout(function () { if (splash.parentNode) splash.parentNode.removeChild(splash); }, 500);
+      }
+
+      // Hide as soon as Flutter inserts any of its host elements. The exact
+      // tag name has churned across Flutter versions (flutter-view,
+      // flt-glass-pane, flt-scene-host), so match by prefix instead of one
+      // specific name.
+      var observer = new MutationObserver(function (mutations) {
+        for (var i = 0; i < mutations.length; i++) {
+          var added = mutations[i].addedNodes;
+          for (var j = 0; j < added.length; j++) {
+            var n = added[j];
+            if (n.nodeType !== 1) continue;
+            var t = n.tagName ? n.tagName.toLowerCase() : '';
+            if (t.indexOf('flt-') === 0 || t.indexOf('flutter-') === 0) {
+              hideSplash('flutter element <' + t + '> mounted');
+              return;
+            }
+          }
+        }
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+
+      // Safety net: never leave the user permanently stuck behind the splash.
+      // If Flutter painted but the observer missed it for some reason, the
+      // user will at least see whatever's there.
+      setTimeout(function () { hideSplash('timeout (25s)'); }, 25000);
+    })();
+  </script>
+
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
