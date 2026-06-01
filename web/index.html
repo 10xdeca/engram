@@ -38,8 +38,112 @@
 
   <title>engram</title>
   <link rel="manifest" href="manifest.json">
+
+  <!--
+    Branded boot splash. Flutter web's debug build loads ~1200 DDC module
+    scripts before painting its first frame, leaving an unstyled white page
+    for several seconds. This splash renders immediately from static HTML so
+    the user sees a branded loading state instead, with a rotating status
+    message that names the current phase. It hides itself when Flutter
+    inserts <flutter-view> into the body (the unambiguous "first frame"
+    signal in bootstrap.js 3.22+, which has no documented ready callback).
+  -->
+  <style>
+    :root {
+      --splash-bg: #f8f4ff;
+      --splash-fg: #1a1a2e;
+      --splash-muted: #6b6b8a;
+      --splash-accent: #7c6cdf;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --splash-bg: #0d0d12;
+        --splash-fg: #e8e6f0;
+        --splash-muted: #8a8aa3;
+      }
+    }
+    html, body { margin: 0; padding: 0; height: 100%; background: var(--splash-bg); }
+    #splash {
+      position: fixed; inset: 0; z-index: 9999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: var(--splash-bg); color: var(--splash-fg);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      transition: opacity 400ms ease-out;
+    }
+    #splash.hide { opacity: 0; pointer-events: none; }
+    #splash-icon {
+      width: 80px; height: 80px; margin-bottom: 24px;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 0.9; }
+      50%      { transform: scale(1.06); opacity: 1; }
+    }
+    #splash-title {
+      font-size: 32px; font-weight: 500; margin: 0 0 6px 0;
+      letter-spacing: -0.5px;
+    }
+    #splash-status {
+      font-size: 14px; color: var(--splash-muted); margin: 0 0 32px 0;
+      min-height: 20px; transition: opacity 200ms ease-out;
+    }
+    #splash-bar {
+      width: 220px; height: 3px; border-radius: 2px;
+      background: rgba(124, 108, 223, 0.15); overflow: hidden; position: relative;
+    }
+    #splash-bar::after {
+      content: ''; position: absolute; inset: 0; width: 40%;
+      background: var(--splash-accent); border-radius: 2px;
+      animation: slide 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+    @keyframes slide {
+      0%   { transform: translateX(-100%); }
+      100% { transform: translateX(350%); }
+    }
+  </style>
 </head>
 <body>
+  <div id="splash" role="status" aria-live="polite">
+    <img id="splash-icon" src="icons/Icon-192.png" alt="">
+    <h1 id="splash-title">Engram</h1>
+    <p id="splash-status">Loading engine…</p>
+    <div id="splash-bar" aria-hidden="true"></div>
+  </div>
+
+  <script>
+    // Rotate status text so the user knows what's happening during the
+    // long debug-build wait. Phases roughly match the actual boot timeline.
+    (function () {
+      var status = document.getElementById('splash-status');
+      var phases = [
+        { at: 0,     text: 'Loading engine…' },
+        { at: 3000,  text: 'Compiling app…' },
+        { at: 8000,  text: 'Loading your knowledge graph…' },
+        { at: 15000, text: 'Almost there…' },
+      ];
+      var timers = phases.slice(1).map(function (p) {
+        return setTimeout(function () {
+          if (!status) return;
+          status.style.opacity = '0';
+          setTimeout(function () { status.textContent = p.text; status.style.opacity = '1'; }, 200);
+        }, p.at);
+      });
+
+      // Hide splash as soon as Flutter inserts its view (first-frame proxy).
+      var observer = new MutationObserver(function () {
+        if (document.querySelector('flutter-view')) {
+          var splash = document.getElementById('splash');
+          if (splash) splash.classList.add('hide');
+          timers.forEach(clearTimeout);
+          observer.disconnect();
+          // Remove from DOM after the fade completes so it can't intercept input.
+          setTimeout(function () { if (splash && splash.parentNode) splash.parentNode.removeChild(splash); }, 500);
+        }
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+    })();
+  </script>
+
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
