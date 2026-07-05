@@ -8,3 +8,6 @@ doc/api/
 .DS_Store
 .env
 .flutter-plugins-dependencies
+
+# Firebase config (contains API keys, regenerate from Firebase console)
+**/GoogleService-Info.plist
