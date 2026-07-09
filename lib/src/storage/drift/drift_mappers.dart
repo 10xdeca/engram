@@ -158,6 +158,7 @@ extension QuizItemToCompanion on QuizItem {
               ? Value(predictedDifficulty)
               : const Value.absent(),
       reviewCount: Value(reviewCount),
+      rubric: rubric != null ? Value(rubric) : const Value.absent(),
       hlc: Value(hlc),
     );
   }
@@ -183,6 +184,7 @@ extension DriftQuizItemToDomain on DriftQuizItem {
       lapses: lapses,
       predictedDifficulty: predictedDifficulty,
       reviewCount: reviewCount,
+      rubric: rubric,
     );
   }
 
@@ -209,6 +211,7 @@ extension DriftQuizItemToDomain on DriftQuizItem {
                 ? Value(predictedDifficulty)
                 : const Value.absent(),
         reviewCount: Value(reviewCount),
+        rubric: rubric != null ? Value(rubric) : const Value.absent(),
         hlc: Value(hlc),
         isDeleted: Value(isDeleted),
       );
