@@ -1,3 +1,4 @@
+import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:meta/meta.dart';
 
 import '../engine/fsrs_engine.dart';
@@ -27,6 +28,7 @@ class QuizItem {
     this.lapses,
     this.predictedDifficulty,
     this.reviewCount = 0,
+    this.rubric,
   });
 
   /// Creates a new card with FSRS state bootstrapped.
@@ -39,6 +41,7 @@ class QuizItem {
     required String question,
     required String answer,
     double? predictedDifficulty,
+    IList<String>? rubric,
     DateTime? now,
   }) {
     final currentTime = now ?? DateTime.now().toUtc();
@@ -60,6 +63,7 @@ class QuizItem {
       fsrsState: fsrs.fsrsState,
       lapses: fsrs.lapses,
       predictedDifficulty: predictedDifficulty,
+      rubric: rubric,
     );
   }
 
@@ -76,6 +80,9 @@ class QuizItem {
     final predictedDifficulty =
         (json['predictedDifficulty'] as num?)?.toDouble();
     final reviewCount = (json['reviewCount'] as num?)?.toInt() ?? 0;
+    final rubric = (json['rubric'] as List<dynamic>?)
+        ?.map((e) => e as String)
+        .toIList();
 
     // Auto-migrate: bootstrap FSRS state for legacy cards.
     if (stability == null || fsrsState == null) {
@@ -99,6 +106,7 @@ class QuizItem {
         lapses: fsrs.lapses,
         predictedDifficulty: predictedDifficulty,
         reviewCount: reviewCount,
+        rubric: rubric,
       );
     }
 
@@ -119,6 +127,7 @@ class QuizItem {
       lapses: lapses,
       predictedDifficulty: predictedDifficulty,
       reviewCount: reviewCount,
+      rubric: rubric,
     );
   }
 
@@ -155,6 +164,16 @@ class QuizItem {
   /// Incremented on each [withFsrsReview] call. Used to gate prediction
   /// evaluation (requires 5+ reviews for meaningful comparison).
   final int reviewCount;
+
+  /// Grading criteria for a blind free-text assessor (2-4 short criteria).
+  ///
+  /// The contract an independent grader checks a learner's free-recall
+  /// production against ("names both terms", "explains why X is needed").
+  /// Null for cards extracted before the rubric schema, or when extraction
+  /// declined to produce one — such cards fall back to self-rating rather
+  /// than assessor grading. Content, not learner state: preserved across
+  /// FSRS reviews and included in [toContentSnapshot].
+  final IList<String>? rubric;
 
   /// Whether this card has full FSRS state.
   ///
@@ -193,6 +212,7 @@ class QuizItem {
       lapses: lapses,
       predictedDifficulty: predictedDifficulty,
       reviewCount: reviewCount + 1,
+      rubric: rubric,
     );
   }
 
@@ -208,6 +228,7 @@ class QuizItem {
     'answer': answer,
     if (difficulty != null) 'difficulty': difficulty,
     if (predictedDifficulty != null) 'predictedDifficulty': predictedDifficulty,
+    if (rubric != null) 'rubric': rubric!.toList(),
   };
 
   Map<String, dynamic> toJson() => {
@@ -224,6 +245,7 @@ class QuizItem {
     if (lapses != null) 'lapses': lapses,
     if (predictedDifficulty != null) 'predictedDifficulty': predictedDifficulty,
     if (reviewCount > 0) 'reviewCount': reviewCount,
+    if (rubric != null) 'rubric': rubric!.toList(),
   };
 
   @override
